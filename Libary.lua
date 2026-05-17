@@ -257,7 +257,7 @@ function Library:CreateWindow(opts)
     self.Title = opts.Title or opts.Name or self.Title
     self.Subtitle = opts.Subtitle or self.Subtitle
     self.Version = opts.Version or self.Version
-    self.Footer = opts.Footer or ("v" .. tostring(self.Version) .. " - Development Build")
+    self.Footer = opts.Footer or ("v" .. tostring(self.Version) .. "By Fatality Wins")
     if opts.NotifySide then self.NotifySide = opts.NotifySide end
     if opts.ShowCustomCursor ~= nil then self.ShowCustomCursor = opts.ShowCustomCursor end
 
@@ -3066,13 +3066,11 @@ local function _patchSharpCorners()
             local c = Instance.new("UICorner")
             c.CornerRadius = UDim.new(0, 10)
             c.Parent = child
-            child.ClipsDescendants = false
         elseif child.Name == "Topbar" then
             Library.Topbar = child
             local c = Instance.new("UICorner")
             c.CornerRadius = UDim.new(0, 10)
             c.Parent = child
-            child.ClipsDescendants = false
         end
     end
 
@@ -3226,7 +3224,9 @@ function Library:_RefreshKeybindList()
     self.KeybindFrame.Visible = count > 0
 end
 
-function Library:_BuildSettingsTab()
+function Library:BuildSettingsTab()
+    if self._SettingsTab then return self._SettingsTab end
+
     local tab = self:AddTab("Settings")
     self._SettingsTab = tab
 
@@ -3240,7 +3240,7 @@ function Library:_BuildSettingsTab()
         end,
     })
 
-    local kb = left:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    left:AddKeyPicker("MenuKeybind", {
         Default = self.ToggleKeybind.Value.Name,
         NoUI = true,
         Text = "Menu Keybind",
@@ -3251,7 +3251,6 @@ function Library:_BuildSettingsTab()
             end
         end,
     })
-    self._MenuKeybindPicker = kb
 
     left:AddInput("CustomFooter", {
         Text = "Footer Text",
@@ -3300,6 +3299,8 @@ function Library:_BuildSettingsTab()
             self:SetNotifySide(v)
         end,
     })
+
+    return tab
 end
 
 local _origCreateWindowFinal = Library.CreateWindow
@@ -3315,7 +3316,8 @@ function Library:CreateWindow(opts)
 
     _patchSharpCorners()
     _replaceMinimizeWithGear()
-    self:_BuildSettingsTab()
+
+    self.CurrentTab = nil
 
     return win
 end
