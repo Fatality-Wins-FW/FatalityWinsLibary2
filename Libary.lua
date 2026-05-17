@@ -3057,4 +3057,324 @@ env.Toggles = Library.Toggles
 env.Options = Library.Options
 env.Library = Library
 
+local function _patchSharpCorners()
+    if not Library.Main then return end
+
+    if Library.Sidebar then return end
+
+    for _, child in ipairs(Library.Main:GetChildren()) do
+        if child.Name == "Sidebar" then
+            Library.Sidebar = child
+            local c = Instance.new("UICorner")
+            c.CornerRadius = UDim.new(0, 10)
+            c.Parent = child
+            child.ClipsDescendants = false
+        elseif child.Name == "Topbar" then
+            Library.Topbar = child
+            local c = Instance.new("UICorner")
+            c.CornerRadius = UDim.new(0, 10)
+            c.Parent = child
+            child.ClipsDescendants = false
+        end
+    end
+
+    if Library.Sidebar then
+        local mask = Library._createInstance("Frame", {
+            Position = UDim2.new(1, -10, 0, 0),
+            Size = UDim2.new(0, 10, 1, 0),
+            BackgroundColor3 = Library.Theme.Sidebar,
+            BorderSizePixel = 0,
+            ZIndex = 0,
+            Parent = Library.Sidebar,
+        })
+        Library:AddToRegistry(mask, { BackgroundColor3 = "Sidebar" })
+    end
+
+    if Library.Topbar then
+        local mask = Library._createInstance("Frame", {
+            Position = UDim2.new(0, 0, 0, 0),
+            Size = UDim2.new(0, 10, 1, 0),
+            BackgroundColor3 = Library.Theme.Topbar,
+            BorderSizePixel = 0,
+            ZIndex = 0,
+            Parent = Library.Topbar,
+        })
+        Library:AddToRegistry(mask, { BackgroundColor3 = "Topbar" })
+    end
+end
+
+local function _replaceMinimizeWithGear()
+    if not Library.Main then return end
+    local topbar
+    for _, c in ipairs(Library.Main:GetChildren()) do
+        if c.Name == "Topbar" then topbar = c break end
+    end
+    if not topbar then return end
+
+    for _, child in ipairs(topbar:GetChildren()) do
+        if child:IsA("TextButton") and child.Text == "—" then
+            child:Destroy()
+        end
+    end
+
+    local gear = Library._createInstance("TextButton", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -20, 0.5, 0),
+        Size = UDim2.new(0, 28, 0, 28),
+        BackgroundColor3 = Library.Theme.Element,
+        BorderSizePixel = 0,
+        Text = "⚙",
+        TextColor3 = Library.Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 16,
+        AutoButtonColor = false,
+        Parent = topbar,
+    })
+    Library._corner(gear, 6)
+    Library:AddToRegistry(gear, { BackgroundColor3 = "Element", TextColor3 = "Text" })
+
+    gear.MouseEnter:Connect(function()
+        Library._tween(gear, 0.12, { BackgroundColor3 = Library.Theme.ElementHover })
+    end)
+    gear.MouseLeave:Connect(function()
+        Library._tween(gear, 0.12, { BackgroundColor3 = Library.Theme.Element })
+    end)
+    gear.MouseButton1Click:Connect(function()
+        if Library._SettingsTab then
+            Library:SetCurrentTab(Library._SettingsTab)
+        end
+    end)
+
+    Library._GearBtn = gear
+
+    local lastClick = 0
+    topbar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local now = tick()
+            if now - lastClick < 0.35 then
+                Library:_ToggleMinimize()
+                lastClick = 0
+            else
+                lastClick = now
+            end
+        end
+    end)
+end
+
+Library._SavedMainSize = nil
+Library.Minimized = false
+function Library:_ToggleMinimize()
+    if not self.Main then return end
+    if self.Minimized then
+        self.Minimized = false
+        if self.ContentFrame then self.ContentFrame.Visible = true end
+        if self.Sidebar then self.Sidebar.Visible = true end
+        self._tween(self.Main, 0.25, { Size = self._SavedMainSize or UDim2.new(0, 720, 0, 520) })
+    else
+        self._SavedMainSize = self.Main.Size
+        self.Minimized = true
+        if self.ContentFrame then self.ContentFrame.Visible = false end
+        if self.Sidebar then self.Sidebar.Visible = false end
+        self._tween(self.Main, 0.25, { Size = UDim2.new(0, 260, 0, 56) })
+    end
+end
+
+function Library:SetFooter(text)
+    self.Footer = text or self.Footer
+    if self.Main then
+        for _, desc in ipairs(self.Main:GetDescendants()) do
+            if desc:IsA("TextLabel") and desc.Parent and desc.Parent.Name == "" and desc.Text:find("Development") then
+                desc.Text = self.Footer
+            end
+        end
+        if self._FooterLbl then
+            self._FooterLbl.Text = self.Footer
+        end
+    end
+end
+
+local _origCreateWindowPatch = Library.CreateWindow
+function Library:CreateWindow(opts)
+    local win = _origCreateWindowPatch(self, opts)
+
+    for _, desc in ipairs(self.Main:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Text == self.Footer then
+            self._FooterLbl = desc
+            break
+        end
+    end
+
+    _patchSharpCorners()
+    _replaceMinimizeWithGear()
+
+    self:_BuildSettingsTab()
+
+    return win
+end
+
+function Library:_BuildSettingsTab()
+    local tab = self:AddTab("Settings")
+    self._SettingsTab = tab
+
+    local left = tab:AddLeftGroupbox("Menu")
+
+    left:AddButton({
+        Text = "Unload",
+        DoubleClick = true,
+        Func = function()
+            self:Unload()
+        end,
+    })
+
+    local kb = left:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+        Default = self.ToggleKeybind.Value.Name,
+        NoUI = true,
+        Text = "Menu Keybind",
+        ChangedCallback = function(newKey)
+            local enumKey = Enum.KeyCode[newKey]
+            if enumKey then
+                self.ToggleKeybind.Value = enumKey
+            end
+        end,
+    })
+    self._MenuKeybindPicker = kb
+
+    left:AddInput("CustomFooter", {
+        Text = "Footer Text",
+        Default = self.Footer,
+        Placeholder = "v1 - Development Build",
+        Finished = true,
+        Callback = function(v)
+            if v and v ~= "" then
+                self:SetFooter(v)
+            end
+        end,
+    })
+
+    local right = tab:AddRightGroupbox("Display")
+
+    right:AddToggle("ShowKeybindList", {
+        Text = "Show Keybind List",
+        Default = false,
+        Callback = function(v)
+            self.KeybindListEnabled = v
+            self:_RefreshKeybindList()
+        end,
+    })
+
+    right:AddToggle("ShowWatermark", {
+        Text = "Show Watermark",
+        Default = false,
+        Callback = function(v)
+            self:SetWatermarkVisibility(v)
+        end,
+    })
+
+    right:AddToggle("CustomCursor", {
+        Text = "Custom Cursor",
+        Default = false,
+        Callback = function(v)
+            self.ShowCustomCursor = v
+        end,
+    })
+
+    right:AddDropdown("NotifySide", {
+        Text = "Notification Side",
+        Values = { "Left", "Right" },
+        Default = self.NotifySide,
+        Callback = function(v)
+            self:SetNotifySide(v)
+        end,
+    })
+end
+
+Library.KeybindListEnabled = false
+
+function Library:_RefreshKeybindList()
+    if not self.KeybindFrame then self:_BuildKeybindList() end
+    if not self._KeybindList then return end
+
+    for _, child in ipairs(self._KeybindList:GetChildren()) do
+        if child:IsA("TextLabel") then child:Destroy() end
+    end
+
+    if not self.KeybindListEnabled then
+        self.KeybindFrame.Visible = false
+        return
+    end
+
+    local count = 0
+    for idx, opt in pairs(self.Options) do
+        if opt.Type == "KeyPicker" and not opt.NoUI then
+            local active = false
+            if opt.Mode == "Always" then active = true
+            elseif opt.Mode == "Toggle" then active = opt.Toggled
+            elseif opt.Mode == "Hold"   then active = opt.Holding end
+
+            if active then
+                count = count + 1
+                Library._createInstance("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 14),
+                    BackgroundTransparency = 1,
+                    Text = opt.Text .. ": [" .. tostring(opt.Value) .. "]",
+                    TextColor3 = self.Theme.Accent,
+                    Font = Enum.Font.Gotham,
+                    TextSize = 11,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = self._KeybindList,
+                })
+            end
+        end
+    end
+
+    self.KeybindFrame.Visible = count > 0
+end
+
+function Library:_BuildKeybindList()
+    if self.KeybindFrame then return end
+    local frame = Library._createInstance("Frame", {
+        Name = "Keybinds",
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 20, 1, -20),
+        Size = UDim2.new(0, 180, 0, 32),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = self.Theme.Groupbox,
+        BorderSizePixel = 0,
+        Visible = false,
+        Parent = self.NotifyGui,
+    })
+    Library._corner(frame, 6)
+    Library._stroke(frame, self.Theme.ElementBorder, 1)
+    self:AddToRegistry(frame, { BackgroundColor3 = "Groupbox" })
+
+    local header = Library._createInstance("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 22),
+        BackgroundTransparency = 1,
+        Text = "Keybinds",
+        TextColor3 = self.Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        Parent = frame,
+    })
+    self:AddToRegistry(header, { TextColor3 = "Text" })
+
+    local list = Library._createInstance("Frame", {
+        Position = UDim2.new(0, 0, 0, 22),
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = frame,
+    })
+    Library._listLayout(list, 2)
+    Library._padding(list, 2, 10, 8, 10)
+
+    self.KeybindFrame = frame
+    self.KeybindContainer = frame
+    self._KeybindList = list
+
+    self:Connect(RunService.Heartbeat, function()
+        self:_RefreshKeybindList()
+    end)
+end
+
 return Library
