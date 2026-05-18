@@ -3479,4 +3479,235 @@ function Library:CreateWindow(opts)
     return win
 end
 
+if Library._OldKeybindHeartbeat then
+    pcall(function() Library._OldKeybindHeartbeat:Disconnect() end)
+end
+
+function Library:_BuildKeybindList()
+    if self.KeybindFrame then return end
+    local frame = createInstance("Frame", {
+        Name = "Keybinds",
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 20, 1, -20),
+        Size = UDim2.new(0, 180, 0, 32),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = self.Theme.Groupbox,
+        BorderSizePixel = 0,
+        Visible = false,
+        Parent = self.NotifyGui,
+    })
+    corner(frame, 6)
+    stroke(frame, self.Theme.ElementBorder, 1)
+    self:AddToRegistry(frame, { BackgroundColor3 = "Groupbox" })
+
+    local header = createInstance("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 22),
+        BackgroundTransparency = 1,
+        Text = "Keybinds",
+        TextColor3 = self.Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        Parent = frame,
+    })
+    self:AddToRegistry(header, { TextColor3 = "Text" })
+
+    local list = createInstance("Frame", {
+        Position = UDim2.new(0, 0, 0, 22),
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = frame,
+    })
+    listLayout(list, 2)
+    padding(list, 2, 10, 8, 10)
+
+    self.KeybindFrame = frame
+    self.KeybindContainer = frame
+    self._KeybindList = list
+
+    local function _makeDrag(f)
+        local dragging, dragStart, startPos
+        f.Active = true
+        f.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = f.Position
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                f.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+    end
+    _makeDrag(frame)
+
+    self._OldKeybindHeartbeat = self:Connect(RunService.Heartbeat, function()
+        self:_RefreshKeybindList()
+    end)
+end
+
+if Library.KeybindFrame then
+    Library.KeybindFrame:Destroy()
+    Library.KeybindFrame = nil
+    Library._KeybindList = nil
+    Library:_BuildKeybindList()
+end
+
+local _origHookModule = Library._HookModuleToggles
+function Library:_HookModuleToggles()
+    for _, tab in ipairs(self.Tabs) do
+        if not tab._IsSettings and tab._ModSwitch and not tab._ModuleHooked then
+            tab._ModuleHooked = true
+            tab._ModuleEnabled = false
+
+            local overlay = createInstance("TextButton", {
+                Name = "ModuleOverlay",
+                Position = UDim2.new(0, 0, 0, 44),
+                Size = UDim2.new(1, 0, 1, -44),
+                BackgroundColor3 = self.Theme.Background,
+                BackgroundTransparency = 0.4,
+                BorderSizePixel = 0,
+                Text = "",
+                AutoButtonColor = false,
+                ZIndex = 100,
+                Visible = true,
+                Active = true,
+                Parent = tab._Page,
+            })
+            self:AddToRegistry(overlay, { BackgroundColor3 = "Background" })
+
+            local msgBox = createInstance("Frame", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(0, 320, 0, 80),
+                BackgroundColor3 = self.Theme.Groupbox,
+                BorderSizePixel = 0,
+                ZIndex = 101,
+                Parent = overlay,
+            })
+            corner(msgBox, 8)
+            stroke(msgBox, self.Theme.ElementBorder, 1)
+            self:AddToRegistry(msgBox, { BackgroundColor3 = "Groupbox" })
+
+            local title = createInstance("TextLabel", {
+                Position = UDim2.new(0, 0, 0, 14),
+                Size = UDim2.new(1, 0, 0, 18),
+                BackgroundTransparency = 1,
+                Text = "Module Disabled",
+                TextColor3 = self.Theme.Text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 14,
+                ZIndex = 102,
+                Parent = msgBox,
+            })
+            self:AddToRegistry(title, { TextColor3 = "Text" })
+
+            local sub = createInstance("TextLabel", {
+                Position = UDim2.new(0, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 32),
+                BackgroundTransparency = 1,
+                Text = "Enable this module using the toggle in the top-right corner.",
+                TextColor3 = self.Theme.TextDim,
+                Font = Enum.Font.Gotham,
+                TextSize = 11,
+                TextWrapped = true,
+                ZIndex = 102,
+                Parent = msgBox,
+            })
+            self:AddToRegistry(sub, { TextColor3 = "TextDim" })
+
+            tab._ModuleOverlay = overlay
+
+            tab._ModSwitch.MouseButton1Click:Connect(function()
+                task.wait()
+                tab._ModuleEnabled = not tab._ModuleEnabled
+                overlay.Visible = not tab._ModuleEnabled
+            end)
+        end
+    end
+end
+
+for _, tab in ipairs(Library.Tabs) do
+    if tab._ModuleOverlay then
+        tab._ModuleOverlay:Destroy()
+        tab._ModuleOverlay = nil
+        tab._ModuleHooked = false
+    end
+end
+task.defer(function()
+    Library:_HookModuleToggles()
+end)
+
+local function _patchColorPickerOnLabel()
+    local _attachColorOrig = nil
+    for _, tab in ipairs(Library.Tabs) do
+        if tab._Left then
+            for _, child in ipairs(tab._Left:GetDescendants()) do
+                if child:IsA("TextLabel") then
+                    if child.Size.X.Scale == 1 and not child.Parent:FindFirstChild("ColorSlot") then
+                    end
+                end
+            end
+        end
+    end
+end
+
+local _origAddLabel
+do
+    local sampleHost = { _Container = Instance.new("Frame") }
+    Library:_AttachElementMethods(sampleHost)
+    _origAddLabel = sampleHost.AddLabel
+end
+
+local function _wrapAddLabel(host)
+    if host._LabelPatched then return end
+    host._LabelPatched = true
+    local realAdd = host.AddLabel
+    function host:AddLabel(text, doesWrap)
+        local element = realAdd(self, text, doesWrap)
+
+        local row = createInstance("Frame", {
+            Size = UDim2.new(1, 0, 0, 22),
+            BackgroundTransparency = 1,
+            Parent = self._Container,
+        })
+
+        if element._Label then
+            element._Label.Parent = row
+            element._Label.Size = UDim2.new(1, -32, 1, 0)
+            element._Label.Position = UDim2.new(0, 0, 0, 0)
+            element._Label.TextYAlignment = Enum.TextYAlignment.Center
+        end
+
+        element._Row = row
+
+        local origAddCP = element.AddColorPicker
+        function element:AddColorPicker(cidx, copts)
+            return host:_AttachColorPicker(row, element, cidx, copts)
+        end
+
+        local origAddKP = element.AddKeyPicker
+        function element:AddKeyPicker(kidx, kopts)
+            return host:_AttachKeyPicker(row, element, kidx, kopts)
+        end
+
+        return element
+    end
+end
+
+local _origCreateGroupbox = Library._CreateGroupbox
+function Library:_CreateGroupbox(parent, name, parentTab)
+    local gb = _origCreateGroupbox(self, parent, name, parentTab)
+    _wrapAddLabel(gb)
+    return gb
+end
+
 return Library
