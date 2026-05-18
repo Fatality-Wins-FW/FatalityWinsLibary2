@@ -3542,121 +3542,6 @@ local function _patchColorPickerPosition(element)
     end
 end
 
-for idx, opt in pairs(Library.Options) do
-    if opt.Type == "ColorPicker" and opt._Btn then
-        local element = opt
-        local pickerBtn = element._Btn
-
-        local popup
-        for _, c in ipairs(Library.ScreenGui:GetChildren()) do
-            if c:IsA("Frame") and c.ZIndex == 200 then
-                for _, d in ipairs(c:GetDescendants()) do
-                    if d:IsA("TextLabel") and d.Text == element.Title then
-                        popup = c break
-                    end
-                end
-                if popup then break end
-            end
-        end
-
-        if popup then
-            local svBox, hueBar, svCursor, hueCursor, satGrad
-            for _, child in ipairs(popup:GetChildren()) do
-                if child:IsA("ImageButton") then
-                    if child.AbsoluteSize.X > child.AbsoluteSize.Y then
-                        svBox = child
-                    else
-                        hueBar = child
-                    end
-                end
-            end
-
-            if svBox and hueBar then
-                for _, c in ipairs(svBox:GetChildren()) do
-                    if c:IsA("Frame") and c.AnchorPoint == Vector2.new(0.5, 0.5) then
-                        svCursor = c
-                    end
-                end
-                for _, c in ipairs(hueBar:GetChildren()) do
-                    if c:IsA("Frame") and c.AnchorPoint == Vector2.new(0.5, 0.5) then
-                        hueCursor = c
-                    end
-                end
-                satGrad = svBox:FindFirstChildOfClass("UIGradient")
-
-                local function updateAll()
-                    local color = Color3.fromHSV(element._H, element._S, element._V)
-                    element.Value = color
-                    pickerBtn.BackgroundColor3 = color
-                    if satGrad then
-                        satGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(element._H, 1, 1))
-                    end
-                    svBox.BackgroundColor3 = Color3.fromHSV(element._H, 1, 1)
-                    if svCursor then svCursor.Position = UDim2.new(element._S, 0, 1 - element._V, 0) end
-                    if hueCursor then hueCursor.Position = UDim2.new(0.5, 0, element._H, 0) end
-                end
-
-                local svDragConn, hueDragConn, endConn
-                if svDragConn then svDragConn:Disconnect() end
-                if hueDragConn then hueDragConn:Disconnect() end
-                if endConn then endConn:Disconnect() end
-
-                local svDragging = false
-                local hueDragging = false
-
-                svBox.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        svDragging = true
-                        local rel = Vector2.new(input.Position.X, input.Position.Y) - svBox.AbsolutePosition
-                        element._S = math.clamp(rel.X / svBox.AbsoluteSize.X, 0, 1)
-                        element._V = 1 - math.clamp(rel.Y / svBox.AbsoluteSize.Y, 0, 1)
-                        updateAll()
-                    end
-                end)
-
-                hueBar.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        hueDragging = true
-                        local rel = input.Position.Y - hueBar.AbsolutePosition.Y
-                        element._H = math.clamp(rel / hueBar.AbsoluteSize.Y, 0, 1)
-                        updateAll()
-                    end
-                end)
-
-                game:GetService("RunService").RenderStepped:Connect(function()
-                    if not popup.Visible then return end
-                    if svDragging then
-                        local mp = UserInputService:GetMouseLocation()
-                        local rel = Vector2.new(mp.X, mp.Y - 36) - svBox.AbsolutePosition
-                        element._S = math.clamp(rel.X / svBox.AbsoluteSize.X, 0, 1)
-                        element._V = 1 - math.clamp(rel.Y / svBox.AbsoluteSize.Y, 0, 1)
-                        updateAll()
-                    end
-                    if hueDragging then
-                        local mp = UserInputService:GetMouseLocation()
-                        local rel = (mp.Y - 36) - hueBar.AbsolutePosition.Y
-                        element._H = math.clamp(rel / hueBar.AbsoluteSize.Y, 0, 1)
-                        updateAll()
-                    end
-                end)
-
-                UserInputService.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        if svDragging or hueDragging then
-                            svDragging = false
-                            hueDragging = false
-                            Library:SafeCallback(element.Callbacks[1], element.Value, element.Transparency)
-                            for _, cb in ipairs(element.Callbacks) do
-                                Library:SafeCallback(cb, element.Value, element.Transparency)
-                            end
-                        end
-                    end
-                end)
-            end
-        end
-    end
-end
-
 if Library.Main then
     local main = Library.Main
     local function clampNow()
@@ -3726,5 +3611,154 @@ if Library.ContentFrame then
         end
     end
 end
+
+task.defer(function()
+    for idx, opt in pairs(Library.Options) do
+        if opt.Type == "ColorPicker" and opt._Btn then
+            local element = opt
+            local pickerBtn = element._Btn
+
+            local popup
+            for _, c in ipairs(Library.ScreenGui:GetChildren()) do
+                if c:IsA("Frame") and c.ZIndex == 200 then
+                    for _, d in ipairs(c:GetDescendants()) do
+                        if d:IsA("TextLabel") and d.Text == element.Title then
+                            popup = c break
+                        end
+                    end
+                    if popup then break end
+                end
+            end
+
+            if popup then
+                local svBox, hueBar, svCursor, hueCursor, satGrad
+                for _, child in ipairs(popup:GetChildren()) do
+                    if child:IsA("ImageButton") then
+                        if child.AbsoluteSize.X > child.AbsoluteSize.Y then
+                            svBox = child
+                        else
+                            hueBar = child
+                        end
+                    end
+                end
+
+                if svBox and hueBar then
+                    for _, c in ipairs(svBox:GetChildren()) do
+                        if c:IsA("Frame") and c.AnchorPoint == Vector2.new(0.5, 0.5) then
+                            svCursor = c
+                        end
+                    end
+                    for _, c in ipairs(hueBar:GetChildren()) do
+                        if c:IsA("Frame") and c.AnchorPoint == Vector2.new(0.5, 0.5) then
+                            hueCursor = c
+                        end
+                    end
+                    satGrad = svBox:FindFirstChildOfClass("UIGradient")
+
+                    local function updateAll()
+                        local color = Color3.fromHSV(element._H, element._S, element._V)
+                        element.Value = color
+                        pickerBtn.BackgroundColor3 = color
+                        if satGrad then
+                            satGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(element._H, 1, 1))
+                        end
+                        svBox.BackgroundColor3 = Color3.fromHSV(element._H, 1, 1)
+                        if svCursor then svCursor.Position = UDim2.new(element._S, 0, 1 - element._V, 0) end
+                        if hueCursor then hueCursor.Position = UDim2.new(0.5, 0, element._H, 0) end
+                    end
+
+                    local svDragging = false
+                    local hueDragging = false
+
+                    svBox.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                            svDragging = true
+                            local rel = Vector2.new(input.Position.X, input.Position.Y) - svBox.AbsolutePosition
+                            element._S = math.clamp(rel.X / svBox.AbsoluteSize.X, 0, 1)
+                            element._V = 1 - math.clamp(rel.Y / svBox.AbsoluteSize.Y, 0, 1)
+                            updateAll()
+                        end
+                    end)
+
+                    hueBar.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                            hueDragging = true
+                            local rel = input.Position.Y - hueBar.AbsolutePosition.Y
+                            element._H = math.clamp(rel / hueBar.AbsoluteSize.Y, 0, 1)
+                            updateAll()
+                        end
+                    end)
+
+                    RunService.RenderStepped:Connect(function()
+                        if not popup.Visible then return end
+                        if svDragging then
+                            local mp = UserInputService:GetMouseLocation()
+                            local rel = Vector2.new(mp.X, mp.Y - 36) - svBox.AbsolutePosition
+                            element._S = math.clamp(rel.X / svBox.AbsoluteSize.X, 0, 1)
+                            element._V = 1 - math.clamp(rel.Y / svBox.AbsoluteSize.Y, 0, 1)
+                            updateAll()
+                        end
+                        if hueDragging then
+                            local mp = UserInputService:GetMouseLocation()
+                            local rel = (mp.Y - 36) - hueBar.AbsolutePosition.Y
+                            element._H = math.clamp(rel / hueBar.AbsoluteSize.Y, 0, 1)
+                            updateAll()
+                        end
+                    end)
+
+                    UserInputService.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                            if svDragging or hueDragging then
+                                svDragging = false
+                                hueDragging = false
+                                for _, cb in ipairs(element.Callbacks) do
+                                    Library:SafeCallback(cb, element.Value, element.Transparency)
+                                end
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
+    if Library.Main then
+        local main = Library.Main
+        local function clampNow()
+            local cur = main.AbsoluteSize
+            local maxW = (Library.MaxSize and Library.MaxSize.X) or 1280
+            local maxH = (Library.MaxSize and Library.MaxSize.Y) or 760
+            local minW = (Library.MinSize and Library.MinSize.X) or 900
+            local minH = (Library.MinSize and Library.MinSize.Y) or 560
+            if cur.X > maxW or cur.Y > maxH or cur.X < minW or cur.Y < minH then
+                local newW = math.clamp(cur.X, minW, maxW)
+                local newH = math.clamp(cur.Y, minH, maxH)
+                main.Size = UDim2.fromOffset(newW, newH)
+            end
+        end
+
+        main:GetPropertyChangedSignal("Size"):Connect(clampNow)
+        main:GetPropertyChangedSignal("AbsoluteSize"):Connect(clampNow)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                clampNow()
+            end
+        end)
+    end
+
+    if Library.ContentFrame then
+        Library.ContentFrame.ClipsDescendants = true
+        for _, page in ipairs(Library.ContentFrame:GetChildren()) do
+            if page:IsA("CanvasGroup") then
+                for _, child in ipairs(page:GetDescendants()) do
+                    if child:IsA("ScrollingFrame") then
+                        child.ClipsDescendants = true
+                    end
+                end
+            end
+        end
+    end
+end)
 
 return Library
