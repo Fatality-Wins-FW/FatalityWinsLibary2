@@ -2515,7 +2515,6 @@ local _prevAttach = Library._AttachElementMethods
 function Library:_AttachElementMethods(host)
     _prevAttach(self, host)
     _addColorPickerToHost(host)
-    _addKeyPickerToHost(host)
 end
 
 function Library:Notify(opts, timeOverride)
