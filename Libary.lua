@@ -2511,6 +2511,184 @@ local function _addColorPickerToHost(host)
     end
 end
 
+local function _addKeyPickerToHost(host)
+
+    local function buildKeyPicker(parentRow, idx, opts, mode)
+        opts = opts or {}
+        local element = {}
+        element.Type = "KeyPicker"
+        element.Idx = idx
+        element.Value = opts.Default or "None"
+        element.Mode = opts.Mode or "Toggle"
+        element.Text = opts.Text or idx or "Keybind"
+        element.SyncToggleState = opts.SyncToggleState or false
+        element.NoUI = opts.NoUI or false
+        element.Callbacks = {}
+        element.ChangedCallbacks = {}
+        element.Toggled = false
+        element.Holding = false
+
+        local btn = createInstance("TextButton", {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = mode == "row" and UDim2.new(1, -44, 0.5, 0) or UDim2.new(1, 0, 0.5, 0),
+            Size = UDim2.new(0, 90, 0, 20),
+            BackgroundColor3 = Library.Theme.Element,
+            BorderSizePixel = 0,
+            Text = tostring(element.Value),
+            TextColor3 = Library.Theme.TextDim,
+            Font = Enum.Font.Gotham,
+            TextSize = 11,
+            AutoButtonColor = false,
+            Parent = parentRow,
+        })
+        corner(btn, 4)
+        stroke(btn, Library.Theme.ElementBorder, 1)
+        Library:AddToRegistry(btn, { BackgroundColor3 = "Element", TextColor3 = "TextDim" })
+
+        element._Btn = btn
+
+        local listening = false
+
+        local function setText()
+            if listening then
+                btn.Text = "..."
+            else
+                btn.Text = "[" .. tostring(element.Value) .. "]"
+            end
+        end
+
+        btn.MouseButton1Click:Connect(function()
+            listening = true
+            setText()
+        end)
+
+        local function keyToString(input)
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                return input.KeyCode.Name
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                return "MB1"
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                return "MB2"
+            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                return "MB3"
+            end
+            return nil
+        end
+
+        Library:Connect(UserInputService.InputBegan, function(input, processed)
+            if listening then
+                local key = keyToString(input)
+                if key then
+                    element.Value = key
+                    listening = false
+                    setText()
+                    Library:SafeCallback(opts.ChangedCallback, element.Value)
+                    for _, cb in ipairs(element.ChangedCallbacks) do
+                        Library:SafeCallback(cb, element.Value)
+                    end
+                    if Library.SaveManager then
+                        pcall(function() Library.SaveManager:Save() end)
+                    end
+                end
+                return
+            end
+            if processed then return end
+            local key = keyToString(input)
+            if key and key == element.Value then
+                if element.Mode == "Toggle" then
+                    element.Toggled = not element.Toggled
+                    if element.SyncToggleState and parentElement and parentElement.SetValue then
+                        parentElement:SetValue(element.Toggled)
+                    end
+                    Library:SafeCallback(opts.Callback, element.Toggled)
+                    for _, cb in ipairs(element.Callbacks) do
+                        Library:SafeCallback(cb, element.Toggled)
+                    end
+                elseif element.Mode == "Hold" then
+                    element.Holding = true
+                    Library:SafeCallback(opts.Callback, true)
+                    for _, cb in ipairs(element.Callbacks) do
+                        Library:SafeCallback(cb, true)
+                    end
+                elseif element.Mode == "Always" then
+                end
+            end
+        end)
+
+        Library:Connect(UserInputService.InputEnded, function(input)
+            local key = keyToString(input)
+            if key and key == element.Value and element.Mode == "Hold" then
+                element.Holding = false
+                Library:SafeCallback(opts.Callback, false)
+                for _, cb in ipairs(element.Callbacks) do
+                    Library:SafeCallback(cb, false)
+                end
+            end
+        end)
+
+        function element:GetState()
+            if element.Mode == "Always" then return true end
+            if element.Mode == "Toggle" then return element.Toggled end
+            if element.Mode == "Hold"   then return element.Holding end
+            return false
+        end
+
+        function element:SetValue(data)
+            if type(data) == "table" then
+                element.Value = data[1] or element.Value
+                element.Mode  = data[2] or element.Mode
+            else
+                element.Value = data
+            end
+            setText()
+        end
+
+        function element:GetValue() return element.Value end
+
+        function element:OnChanged(cb)
+            table.insert(element.ChangedCallbacks, cb)
+            return element
+        end
+
+        function element:OnClick(cb)
+            table.insert(element.Callbacks, cb)
+            return element
+        end
+
+        if idx then
+            Library.Options[idx] = element
+        end
+
+        setText()
+        return element
+    end
+
+    function host:_AttachKeyPicker(parentRow, parentElement, idx, opts)
+        return buildKeyPicker(parentRow, idx, opts, "row")
+    end
+
+    function host:AddKeyPicker(idx, opts)
+        opts = opts or {}
+        local container = createInstance("Frame", {
+            Size = UDim2.new(1, 0, 0, 26),
+            BackgroundTransparency = 1,
+            Parent = host._Container,
+        })
+        local lbl = createInstance("TextLabel", {
+            Size = UDim2.new(1, -100, 1, 0),
+            BackgroundTransparency = 1,
+            Text = opts.Text or idx or "Keybind",
+            TextColor3 = Library.Theme.Text,
+            Font = Enum.Font.Gotham,
+            TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = container,
+        })
+        Library:AddToRegistry(lbl, { TextColor3 = "Text" })
+        return buildKeyPicker(container, idx, opts, "standalone")
+    end
+end
+
 local _prevAttach = Library._AttachElementMethods
 function Library:_AttachElementMethods(host)
     _prevAttach(self, host)
