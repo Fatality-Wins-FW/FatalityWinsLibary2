@@ -3183,6 +3183,7 @@ function Library:SetFooter(text)
 end
 
 Library.KeybindListEnabled = false
+Library.WatermarkEnabled = false
 
 function Library:_RefreshKeybindList()
     if not self.KeybindFrame then return end
@@ -3221,7 +3222,68 @@ function Library:_RefreshKeybindList()
         end
     end
 
-    self.KeybindFrame.Visible = count > 0
+    self.KeybindFrame.Visible = self.KeybindListEnabled and count > 0
+end
+
+local function _makeDraggable(frame)
+    local dragging, dragStart, startPos
+    frame.Active = true
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+local _origBuildWM = Library._BuildWatermark
+function Library:_BuildWatermark()
+    _origBuildWM(self)
+    if self.Watermark and not self._WatermarkDraggable then
+        _makeDraggable(self.Watermark)
+        self._WatermarkDraggable = true
+    end
+end
+
+local _origBuildKB = Library._BuildKeybindList
+function Library:_BuildKeybindList()
+    _origBuildKB(self)
+    if self.KeybindFrame and not self._KeybindDraggable then
+        _makeDraggable(self.KeybindFrame)
+        self._KeybindDraggable = true
+    end
+end
+
+function Library:_ApplyUIScale()
+    if not self.Main then return end
+    if self._UIScale then return end
+
+    local scale = Instance.new("UIScale")
+    scale.Scale = 1
+    scale.Parent = self.Main
+    self._UIScale = scale
+
+    local baseW = 720
+    local function update()
+        local currentW = self.Main.AbsoluteSize.X / scale.Scale
+        local newScale = math.clamp(self.Main.AbsoluteSize.X / baseW, 0.85, 1.6)
+        scale.Scale = newScale
+    end
+
+    self.Main:GetPropertyChangedSignal("AbsoluteSize"):Connect(update)
+    update()
 end
 
 function Library:_BuildSettingsTabInternal()
@@ -3268,15 +3330,8 @@ function Library:_BuildSettingsTabInternal()
         Text = "Show Watermark",
         Default = false,
         Callback = function(v)
+            self.WatermarkEnabled = v
             self:SetWatermarkVisibility(v)
-        end,
-    })
-
-    right:AddToggle("CustomCursor", {
-        Text = "Custom Cursor",
-        Default = false,
-        Callback = function(v)
-            self.ShowCustomCursor = v
         end,
     })
 
@@ -3294,7 +3349,6 @@ end
 
 function Library:_PinSettingsToBottom()
     if not self._SettingsTabBtn then return end
-    if not self.TabList then return end
     if not self.Sidebar then return end
 
     local btn = self._SettingsTabBtn
@@ -3327,6 +3381,7 @@ function Library:CreateWindow(opts)
 
     _patchSharpCorners()
     _replaceMinimizeWithGear()
+    self:_ApplyUIScale()
 
     self:_BuildSettingsTabInternal()
     self:_PinSettingsToBottom()
