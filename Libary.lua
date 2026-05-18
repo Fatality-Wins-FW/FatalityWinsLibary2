@@ -2134,17 +2134,16 @@ local function _addColorPickerToHost(host)
         element.Idx = idx
         element.Value = opts.Default or Color3.fromRGB(255, 255, 255)
         element.Transparency = opts.Transparency or 0
-        element.Title = opts.Title or "Color"
+        element.Title = opts.Title or opts.Text or "Color"
         element.Callbacks = {}
 
         local h, s, v = Color3.toHSV(element.Value)
         element._H, element._S, element._V = h, s, v
 
-        local size = 20
         local pickerBtn = createInstance("TextButton", {
             AnchorPoint = Vector2.new(1, 0.5),
-            Position = mode == "row" and UDim2.new(1, -44, 0.5, 0) or UDim2.new(1, 0, 0.5, 0),
-            Size = UDim2.new(0, size, 0, size),
+            Position = UDim2.new(1, -4, 0.5, 0),
+            Size = UDim2.new(0, 18, 0, 18),
             BackgroundColor3 = element.Value,
             BorderSizePixel = 0,
             Text = "",
@@ -2158,18 +2157,18 @@ local function _addColorPickerToHost(host)
 
         local popup = createInstance("Frame", {
             Visible = false,
-            Size = UDim2.new(0, 240, 0, 260),
+            Size = UDim2.fromOffset(230, 240),
             BackgroundColor3 = Library.Theme.Groupbox,
             BorderSizePixel = 0,
-            ZIndex = 60,
+            ZIndex = 200,
             Parent = Library.ScreenGui,
         })
         corner(popup, 8)
         stroke(popup, Library.Theme.ElementBorder, 1)
         Library:AddToRegistry(popup, { BackgroundColor3 = "Groupbox" })
 
-        local title = createInstance("TextLabel", {
-            Position = UDim2.new(0, 10, 0, 6),
+        local titleLbl = createInstance("TextLabel", {
+            Position = UDim2.fromOffset(10, 6),
             Size = UDim2.new(1, -20, 0, 16),
             BackgroundTransparency = 1,
             Text = element.Title,
@@ -2177,17 +2176,19 @@ local function _addColorPickerToHost(host)
             Font = Enum.Font.GothamBold,
             TextSize = 12,
             TextXAlignment = Enum.TextXAlignment.Left,
-            ZIndex = 61,
+            ZIndex = 201,
             Parent = popup,
         })
+        Library:AddToRegistry(titleLbl, { TextColor3 = "Text" })
 
-        local svBox = createInstance("ImageLabel", {
-            Position = UDim2.new(0, 10, 0, 26),
-            Size = UDim2.new(0, 180, 0, 140),
+        local svBox = createInstance("ImageButton", {
+            Position = UDim2.fromOffset(10, 26),
+            Size = UDim2.fromOffset(170, 130),
             BackgroundColor3 = Color3.fromHSV(h, 1, 1),
             BorderSizePixel = 0,
             Image = "",
-            ZIndex = 61,
+            AutoButtonColor = false,
+            ZIndex = 201,
             Parent = popup,
         })
         corner(svBox, 4)
@@ -2198,11 +2199,10 @@ local function _addColorPickerToHost(host)
         })
 
         local valOverlay = createInstance("Frame", {
-            Size = UDim2.new(1, 0, 1, 0),
+            Size = UDim2.fromScale(1, 1),
             BackgroundColor3 = Color3.new(0, 0, 0),
-            BackgroundTransparency = 0,
             BorderSizePixel = 0,
-            ZIndex = 62,
+            ZIndex = 202,
             Parent = svBox,
         })
         corner(valOverlay, 4)
@@ -2216,43 +2216,37 @@ local function _addColorPickerToHost(host)
         })
 
         local svCursor = createInstance("Frame", {
-            Size = UDim2.new(0, 8, 0, 8),
+            Size = UDim2.fromOffset(8, 8),
             AnchorPoint = Vector2.new(0.5, 0.5),
-            BackgroundTransparency = 1,
+            BackgroundColor3 = Color3.new(1, 1, 1),
             BorderSizePixel = 0,
-            ZIndex = 64,
+            ZIndex = 204,
             Parent = svBox,
         })
-        local svRing = createInstance("Frame", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1,
-            BorderSizePixel = 0,
-            ZIndex = 64,
-            Parent = svCursor,
-        })
-        corner(svRing, 4)
-        stroke(svRing, Color3.new(1, 1, 1), 2)
+        corner(svCursor, 4)
+        stroke(svCursor, Color3.new(0, 0, 0), 1)
 
-        local hueBar = createInstance("ImageLabel", {
-            Position = UDim2.new(0, 198, 0, 26),
-            Size = UDim2.new(0, 14, 0, 140),
+        local hueBar = createInstance("ImageButton", {
+            Position = UDim2.fromOffset(188, 26),
+            Size = UDim2.fromOffset(14, 130),
             BackgroundColor3 = Color3.new(1, 1, 1),
             BorderSizePixel = 0,
             Image = "",
-            ZIndex = 61,
+            AutoButtonColor = false,
+            ZIndex = 201,
             Parent = popup,
         })
         corner(hueBar, 3)
         createInstance("UIGradient", {
             Rotation = 90,
             Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0.00, Color3.fromHSV(0,    1, 1)),
+                ColorSequenceKeypoint.new(0.00, Color3.fromHSV(0.00, 1, 1)),
                 ColorSequenceKeypoint.new(0.17, Color3.fromHSV(0.17, 1, 1)),
                 ColorSequenceKeypoint.new(0.33, Color3.fromHSV(0.33, 1, 1)),
                 ColorSequenceKeypoint.new(0.50, Color3.fromHSV(0.50, 1, 1)),
                 ColorSequenceKeypoint.new(0.67, Color3.fromHSV(0.67, 1, 1)),
                 ColorSequenceKeypoint.new(0.83, Color3.fromHSV(0.83, 1, 1)),
-                ColorSequenceKeypoint.new(1.00, Color3.fromHSV(1,    1, 1)),
+                ColorSequenceKeypoint.new(1.00, Color3.fromHSV(1.00, 1, 1)),
             }),
             Parent = hueBar,
         })
@@ -2262,47 +2256,17 @@ local function _addColorPickerToHost(host)
             Size = UDim2.new(1, 4, 0, 3),
             BackgroundColor3 = Color3.new(1, 1, 1),
             BorderSizePixel = 0,
-            ZIndex = 63,
+            ZIndex = 203,
             Parent = hueBar,
         })
         corner(hueCursor, 1)
 
-        local alphaBar
-        local alphaCursor
-        if opts.Transparency ~= nil then
-            alphaBar = createInstance("Frame", {
-                Position = UDim2.new(0, 10, 0, 174),
-                Size = UDim2.new(0, 202, 0, 12),
-                BackgroundColor3 = element.Value,
-                BorderSizePixel = 0,
-                ZIndex = 61,
-                Parent = popup,
-            })
-            corner(alphaBar, 3)
-            createInstance("UIGradient", {
-                Transparency = NumberSequence.new({
-                    NumberSequenceKeypoint.new(0, 1),
-                    NumberSequenceKeypoint.new(1, 0),
-                }),
-                Parent = alphaBar,
-            })
-            alphaCursor = createInstance("Frame", {
-                AnchorPoint = Vector2.new(0.5, 0.5),
-                Size = UDim2.new(0, 3, 1, 4),
-                BackgroundColor3 = Color3.new(1, 1, 1),
-                BorderSizePixel = 0,
-                ZIndex = 63,
-                Parent = alphaBar,
-            })
-            corner(alphaCursor, 1)
-        end
-
         local hexBox = createInstance("Frame", {
-            Position = UDim2.new(0, 10, 1, -64),
-            Size = UDim2.new(1, -20, 0, 24),
+            Position = UDim2.fromOffset(10, 164),
+            Size = UDim2.new(1, -20, 0, 22),
             BackgroundColor3 = Library.Theme.Element,
             BorderSizePixel = 0,
-            ZIndex = 61,
+            ZIndex = 201,
             Parent = popup,
         })
         corner(hexBox, 4)
@@ -2310,30 +2274,31 @@ local function _addColorPickerToHost(host)
         Library:AddToRegistry(hexBox, { BackgroundColor3 = "Element" })
 
         local hexInput = createInstance("TextBox", {
-            Size = UDim2.new(1, -16, 1, 0),
-            Position = UDim2.new(0, 8, 0, 0),
+            Size = UDim2.new(1, -12, 1, 0),
+            Position = UDim2.fromOffset(6, 0),
             BackgroundTransparency = 1,
-            Text = string.format("#%02X%02X%02X", element.Value.R*255, element.Value.G*255, element.Value.B*255),
+            Text = string.format("#%02X%02X%02X", element.Value.R * 255, element.Value.G * 255, element.Value.B * 255),
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Code,
-            TextSize = 12,
+            TextSize = 11,
             TextXAlignment = Enum.TextXAlignment.Left,
             ClearTextOnFocus = false,
-            ZIndex = 62,
+            ZIndex = 202,
             Parent = hexBox,
         })
+        Library:AddToRegistry(hexInput, { TextColor3 = "Text" })
 
         local doneBtn = createInstance("TextButton", {
-            Position = UDim2.new(0, 10, 1, -34),
-            Size = UDim2.new(1, -20, 0, 26),
+            Position = UDim2.fromOffset(10, 194),
+            Size = UDim2.new(1, -20, 0, 22),
             BackgroundColor3 = Library.Theme.Accent,
             BorderSizePixel = 0,
             Text = "Done",
             TextColor3 = Color3.new(1, 1, 1),
             Font = Enum.Font.GothamMedium,
-            TextSize = 12,
+            TextSize = 11,
             AutoButtonColor = false,
-            ZIndex = 61,
+            ZIndex = 201,
             Parent = popup,
         })
         corner(doneBtn, 4)
@@ -2345,13 +2310,10 @@ local function _addColorPickerToHost(host)
             pickerBtn.BackgroundColor3 = color
             satGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(element._H, 1, 1))
             svBox.BackgroundColor3 = Color3.fromHSV(element._H, 1, 1)
-            valOverlay.BackgroundTransparency = element._V
             svCursor.Position = UDim2.new(element._S, 0, 1 - element._V, 0)
             hueCursor.Position = UDim2.new(0.5, 0, element._H, 0)
-            hexInput.Text = string.format("#%02X%02X%02X", color.R*255, color.G*255, color.B*255)
-            if alphaBar then
-                alphaBar.BackgroundColor3 = color
-                alphaCursor.Position = UDim2.new(1 - element.Transparency, 0, 0.5, 0)
+            if not hexInput:IsFocused() then
+                hexInput.Text = string.format("#%02X%02X%02X", color.R * 255, color.G * 255, color.B * 255)
             end
         end
 
@@ -2365,52 +2327,53 @@ local function _addColorPickerToHost(host)
             end
         end
 
-        local svDragging, hueDragging, alphaDragging
+        local svDragging = false
+        local hueDragging = false
+
+        local function updateSV(input)
+            local rel = Vector2.new(input.Position.X, input.Position.Y) - svBox.AbsolutePosition
+            local sX = math.clamp(rel.X / svBox.AbsoluteSize.X, 0, 1)
+            local sY = math.clamp(rel.Y / svBox.AbsoluteSize.Y, 0, 1)
+            element._S = sX
+            element._V = 1 - sY
+            updateAll()
+        end
+
+        local function updateHue(input)
+            local rel = input.Position.Y - hueBar.AbsolutePosition.Y
+            local hY = math.clamp(rel / hueBar.AbsoluteSize.Y, 0, 1)
+            element._H = hY
+            updateAll()
+        end
+
         svBox.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 svDragging = true
+                updateSV(input)
             end
         end)
+
         hueBar.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 hueDragging = true
+                updateHue(input)
             end
         end)
-        if alphaBar then
-            alphaBar.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    alphaDragging = true
-                end
-            end)
-        end
+
         UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                if svDragging or hueDragging or alphaDragging then
-                    svDragging, hueDragging, alphaDragging = false, false, false
+                if svDragging or hueDragging then
+                    svDragging = false
+                    hueDragging = false
                     fire()
                 end
             end
         end)
+
         UserInputService.InputChanged:Connect(function(input)
             if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
-            if svDragging then
-                local rel = input.Position - svBox.AbsolutePosition
-                local sX = math.clamp(rel.X / svBox.AbsoluteSize.X, 0, 1)
-                local sY = math.clamp(rel.Y / svBox.AbsoluteSize.Y, 0, 1)
-                element._S = sX
-                element._V = 1 - sY
-                updateAll()
-            elseif hueDragging then
-                local rel = input.Position.Y - hueBar.AbsolutePosition.Y
-                local hY = math.clamp(rel / hueBar.AbsoluteSize.Y, 0, 1)
-                element._H = hY
-                updateAll()
-            elseif alphaDragging and alphaBar then
-                local rel = input.Position.X - alphaBar.AbsolutePosition.X
-                local aX = math.clamp(rel / alphaBar.AbsoluteSize.X, 0, 1)
-                element.Transparency = 1 - aX
-                updateAll()
-            end
+            if svDragging then updateSV(input) end
+            if hueDragging then updateHue(input) end
         end)
 
         hexInput.FocusLost:Connect(function()
@@ -2435,26 +2398,43 @@ local function _addColorPickerToHost(host)
         end)
 
         function element:Open()
-            if Library.OpenedColorPicker and Library.OpenedColorPicker ~= element then
+            if Library.OpenedColorPicker and Library.OpenedColorPicker ~= self then
                 Library.OpenedColorPicker:Close()
             end
-            Library.OpenedColorPicker = element
+            Library.OpenedColorPicker = self
+
             local ap = pickerBtn.AbsolutePosition
             local as = pickerBtn.AbsoluteSize
-            popup.Position = UDim2.new(0, ap.X - 240 + as.X, 0, ap.Y + as.Y + 4)
+            local ps = popup.AbsoluteSize
+            if ps.X == 0 then ps = Vector2.new(230, 240) end
+
+            local screenSize = workspace.CurrentCamera.ViewportSize
+
+            local px = ap.X + as.X - ps.X
+            local py = ap.Y + as.Y + 6
+
+            if py + ps.Y > screenSize.Y - 10 then
+                py = ap.Y - ps.Y - 6
+            end
+            if px < 10 then px = 10 end
+            if px + ps.X > screenSize.X - 10 then
+                px = screenSize.X - ps.X - 10
+            end
+
+            popup.Position = UDim2.fromOffset(px, py)
             popup.Visible = true
             updateAll()
         end
 
         function element:Close()
             popup.Visible = false
-            if Library.OpenedColorPicker == element then
+            if Library.OpenedColorPicker == self then
                 Library.OpenedColorPicker = nil
             end
         end
 
         function element:Toggle()
-            if popup.Visible then element:Close() else element:Open() end
+            if popup.Visible then self:Close() else self:Open() end
         end
 
         function element:SetValueRGB(color, transparency)
@@ -2485,10 +2465,10 @@ local function _addColorPickerToHost(host)
                 if popup.Visible then
                     local mp = input.Position
                     local pp = popup.AbsolutePosition
-                    local ps = popup.AbsoluteSize
+                    local ps2 = popup.AbsoluteSize
                     local bp = pickerBtn.AbsolutePosition
                     local bs = pickerBtn.AbsoluteSize
-                    local inPopup = mp.X >= pp.X and mp.X <= pp.X + ps.X and mp.Y >= pp.Y and mp.Y <= pp.Y + ps.Y
+                    local inPopup = mp.X >= pp.X and mp.X <= pp.X + ps2.X and mp.Y >= pp.Y and mp.Y <= pp.Y + ps2.Y
                     local inBtn = mp.X >= bp.X and mp.X <= bp.X + bs.X and mp.Y >= bp.Y and mp.Y <= bp.Y + bs.Y
                     if not inPopup and not inBtn then
                         element:Close()
@@ -2511,201 +2491,23 @@ local function _addColorPickerToHost(host)
 
     function host:AddColorPicker(idx, opts)
         opts = opts or {}
-        local container = createInstance("Frame", {
-            Size = UDim2.new(1, 0, 0, 26),
+        local row = createInstance("Frame", {
+            Size = UDim2.new(1, 0, 0, 22),
             BackgroundTransparency = 1,
             Parent = host._Container,
         })
         local lbl = createInstance("TextLabel", {
-            Size = UDim2.new(1, -32, 1, 0),
+            Size = UDim2.new(1, -28, 1, 0),
             BackgroundTransparency = 1,
             Text = opts.Text or opts.Title or idx or "Color",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
             TextSize = 12,
             TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = container,
+            Parent = row,
         })
         Library:AddToRegistry(lbl, { TextColor3 = "Text" })
-        return buildColorPicker(container, idx, opts, "standalone")
-    end
-end
-
-local function _addKeyPickerToHost(host)
-
-    local function buildKeyPicker(parentRow, idx, opts, mode)
-        opts = opts or {}
-        local element = {}
-        element.Type = "KeyPicker"
-        element.Idx = idx
-        element.Value = opts.Default or "None"
-        element.Mode = opts.Mode or "Toggle"
-        element.Text = opts.Text or idx or "Keybind"
-        element.SyncToggleState = opts.SyncToggleState or false
-        element.NoUI = opts.NoUI or false
-        element.Callbacks = {}
-        element.ChangedCallbacks = {}
-        element.Toggled = false
-        element.Holding = false
-
-        local btn = createInstance("TextButton", {
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = mode == "row" and UDim2.new(1, -44, 0.5, 0) or UDim2.new(1, 0, 0.5, 0),
-            Size = UDim2.new(0, 90, 0, 20),
-            BackgroundColor3 = Library.Theme.Element,
-            BorderSizePixel = 0,
-            Text = tostring(element.Value),
-            TextColor3 = Library.Theme.TextDim,
-            Font = Enum.Font.Gotham,
-            TextSize = 11,
-            AutoButtonColor = false,
-            Parent = parentRow,
-        })
-        corner(btn, 4)
-        stroke(btn, Library.Theme.ElementBorder, 1)
-        Library:AddToRegistry(btn, { BackgroundColor3 = "Element", TextColor3 = "TextDim" })
-
-        element._Btn = btn
-
-        local listening = false
-
-        local function setText()
-            if listening then
-                btn.Text = "..."
-            else
-                btn.Text = "[" .. tostring(element.Value) .. "]"
-            end
-        end
-
-        btn.MouseButton1Click:Connect(function()
-            listening = true
-            setText()
-        end)
-
-        local function keyToString(input)
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                return input.KeyCode.Name
-            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-                return "MB1"
-            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-                return "MB2"
-            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-                return "MB3"
-            end
-            return nil
-        end
-
-        Library:Connect(UserInputService.InputBegan, function(input, processed)
-            if listening then
-                local key = keyToString(input)
-                if key then
-                    element.Value = key
-                    listening = false
-                    setText()
-                    Library:SafeCallback(opts.ChangedCallback, element.Value)
-                    for _, cb in ipairs(element.ChangedCallbacks) do
-                        Library:SafeCallback(cb, element.Value)
-                    end
-                    if Library.SaveManager then
-                        pcall(function() Library.SaveManager:Save() end)
-                    end
-                end
-                return
-            end
-            if processed then return end
-            local key = keyToString(input)
-            if key and key == element.Value then
-                if element.Mode == "Toggle" then
-                    element.Toggled = not element.Toggled
-                    if element.SyncToggleState and parentElement and parentElement.SetValue then
-                        parentElement:SetValue(element.Toggled)
-                    end
-                    Library:SafeCallback(opts.Callback, element.Toggled)
-                    for _, cb in ipairs(element.Callbacks) do
-                        Library:SafeCallback(cb, element.Toggled)
-                    end
-                elseif element.Mode == "Hold" then
-                    element.Holding = true
-                    Library:SafeCallback(opts.Callback, true)
-                    for _, cb in ipairs(element.Callbacks) do
-                        Library:SafeCallback(cb, true)
-                    end
-                elseif element.Mode == "Always" then
-                end
-            end
-        end)
-
-        Library:Connect(UserInputService.InputEnded, function(input)
-            local key = keyToString(input)
-            if key and key == element.Value and element.Mode == "Hold" then
-                element.Holding = false
-                Library:SafeCallback(opts.Callback, false)
-                for _, cb in ipairs(element.Callbacks) do
-                    Library:SafeCallback(cb, false)
-                end
-            end
-        end)
-
-        function element:GetState()
-            if element.Mode == "Always" then return true end
-            if element.Mode == "Toggle" then return element.Toggled end
-            if element.Mode == "Hold"   then return element.Holding end
-            return false
-        end
-
-        function element:SetValue(data)
-            if type(data) == "table" then
-                element.Value = data[1] or element.Value
-                element.Mode  = data[2] or element.Mode
-            else
-                element.Value = data
-            end
-            setText()
-        end
-
-        function element:GetValue() return element.Value end
-
-        function element:OnChanged(cb)
-            table.insert(element.ChangedCallbacks, cb)
-            return element
-        end
-
-        function element:OnClick(cb)
-            table.insert(element.Callbacks, cb)
-            return element
-        end
-
-        if idx then
-            Library.Options[idx] = element
-        end
-
-        setText()
-        return element
-    end
-
-    function host:_AttachKeyPicker(parentRow, parentElement, idx, opts)
-        return buildKeyPicker(parentRow, idx, opts, "row")
-    end
-
-    function host:AddKeyPicker(idx, opts)
-        opts = opts or {}
-        local container = createInstance("Frame", {
-            Size = UDim2.new(1, 0, 0, 26),
-            BackgroundTransparency = 1,
-            Parent = host._Container,
-        })
-        local lbl = createInstance("TextLabel", {
-            Size = UDim2.new(1, -100, 1, 0),
-            BackgroundTransparency = 1,
-            Text = opts.Text or idx or "Keybind",
-            TextColor3 = Library.Theme.Text,
-            Font = Enum.Font.Gotham,
-            TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = container,
-        })
-        Library:AddToRegistry(lbl, { TextColor3 = "Text" })
-        return buildKeyPicker(container, idx, opts, "standalone")
+        return buildColorPicker(row, idx, opts, "standalone")
     end
 end
 
