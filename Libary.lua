@@ -3710,4 +3710,138 @@ function Library:_CreateGroupbox(parent, name, parentTab)
     return gb
 end
 
+for _, opt in pairs(Library.Options) do
+    if opt.Type == "ColorPicker" and opt._Btn then
+        opt._Btn.AnchorPoint = Vector2.new(1, 0.5)
+        opt._Btn.Position = UDim2.new(1, -6, 0.5, 0)
+    end
+end
+
+local function _patchColorPickerPosition(element)
+    if not element._Btn then return end
+    element._Btn.AnchorPoint = Vector2.new(1, 0.5)
+    element._Btn.Position = UDim2.new(1, -6, 0.5, 0)
+
+    if element.Open then
+        local origOpen = element.Open
+        function element:Open()
+            if Library.OpenedColorPicker and Library.OpenedColorPicker ~= self then
+                Library.OpenedColorPicker:Close()
+            end
+            Library.OpenedColorPicker = self
+
+            local btn = self._Btn
+            local popup = self._Popup or btn.Parent:FindFirstChild("Frame")
+            if not popup then
+                origOpen(self)
+                return
+            end
+        end
+    end
+end
+
+local function _rebuildAllColorPickers()
+    for idx, opt in pairs(Library.Options) do
+        if opt.Type == "ColorPicker" and opt._Btn then
+            opt._Btn.AnchorPoint = Vector2.new(1, 0.5)
+            opt._Btn.Position = UDim2.new(1, -6, 0.5, 0)
+            opt._Btn.Size = UDim2.new(0, 20, 0, 20)
+        end
+    end
+end
+_rebuildAllColorPickers()
+
+for idx, opt in pairs(Library.Options) do
+    if opt.Type == "ColorPicker" then
+        local origOpen = opt.Open
+        opt.Open = function(self)
+            if Library.OpenedColorPicker and Library.OpenedColorPicker ~= self then
+                Library.OpenedColorPicker:Close()
+            end
+            Library.OpenedColorPicker = self
+
+            local btn = self._Btn
+            if not btn then return end
+
+            local popups = {}
+            for _, child in ipairs(Library.ScreenGui:GetChildren()) do
+                if child:IsA("Frame") and child.ZIndex == 60 and not child.Visible then
+                    table.insert(popups, child)
+                end
+            end
+
+            local popup
+            for _, c in ipairs(Library.ScreenGui:GetChildren()) do
+                if c:IsA("Frame") and c.ZIndex == 60 then
+                    local found = false
+                    for _, d in ipairs(c:GetDescendants()) do
+                        if d:IsA("TextLabel") and d.Text == self.Title then
+                            found = true break
+                        end
+                    end
+                    if found then popup = c break end
+                end
+            end
+
+            if not popup then
+                origOpen(self)
+                return
+            end
+
+            local ap = btn.AbsolutePosition
+            local as = btn.AbsoluteSize
+            local ps = popup.AbsoluteSize
+            if ps.X == 0 then ps = Vector2.new(240, 260) end
+
+            local screenSize = workspace.CurrentCamera.ViewportSize
+            local px = ap.X + as.X - ps.X
+            local py = ap.Y + as.Y + 6
+
+            if px < 10 then px = 10 end
+            if px + ps.X > screenSize.X - 10 then px = screenSize.X - ps.X - 10 end
+            if py + ps.Y > screenSize.Y - 10 then
+                py = ap.Y - ps.Y - 6
+            end
+
+            popup.Position = UDim2.fromOffset(px, py)
+            popup.Visible = true
+
+            if self._H and self._S and self._V then
+            end
+        end
+    end
+end
+
+for _, tab in ipairs(Library.Tabs) do
+    if tab._Left then
+        for _, child in ipairs(tab._Left:GetChildren()) do
+            if child:IsA("Frame") then
+                child.ClipsDescendants = false
+            end
+        end
+    end
+    if tab._Right then
+        for _, child in ipairs(tab._Right:GetChildren()) do
+            if child:IsA("Frame") then
+                child.ClipsDescendants = false
+            end
+        end
+    end
+end
+
+if Library.ContentFrame then
+    Library.ContentFrame.ClipsDescendants = true
+    for _, page in ipairs(Library.ContentFrame:GetChildren()) do
+        if page:IsA("CanvasGroup") then
+            for _, child in ipairs(page:GetDescendants()) do
+                if child:IsA("ScrollingFrame") then
+                    child.ClipsDescendants = true
+                elseif child:IsA("Frame") and child.Name ~= "ModuleOverlay" then
+                    child.ClipsDescendants = false
+                end
+            end
+        end
+    end
+end
+
 return Library
