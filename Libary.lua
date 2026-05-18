@@ -2288,4 +2288,149 @@ env.Toggles = Library.Toggles
 env.Options = Library.Options
 env.Library = Library
 
+task.defer(function()
+    for _, opt in pairs(Library.Options) do
+        if opt.Type == "ColorPicker" and opt._Btn then
+            opt._Btn.AnchorPoint = Vector2.new(1, 0.5)
+            opt._Btn.Position = UDim2.new(1, -6, 0.5, 0)
+        end
+    end
+
+    for _, page in ipairs(Library.ContentFrame:GetChildren()) do
+        if page:IsA("CanvasGroup") then
+            for _, scroll in ipairs(page:GetChildren()) do
+                if scroll:IsA("ScrollingFrame") then
+                    for _, columns in ipairs(scroll:GetChildren()) do
+                        if columns:IsA("Frame") then
+                            for _, col in ipairs(columns:GetChildren()) do
+                                if col:IsA("Frame") then
+                                    for _, gb in ipairs(col:GetChildren()) do
+                                        if gb:IsA("Frame") then
+                                            gb.ClipsDescendants = true
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+function Library:_AttachKeyPickerMenu(element)
+    if element._MenuAttached then return end
+    element._MenuAttached = true
+
+    local btn = element._Btn
+    if not btn then return end
+
+    local menu = Library._createInstance("Frame", {
+        Visible = false,
+        Size = UDim2.fromOffset(110, 76),
+        BackgroundColor3 = Library.Theme.Groupbox,
+        BorderSizePixel = 0,
+        ZIndex = 250,
+        Parent = Library.ScreenGui,
+    })
+    Library._corner(menu, 6)
+    Library._stroke(menu, Library.Theme.ElementBorder, 1)
+    Library:AddToRegistry(menu, { BackgroundColor3 = "Groupbox" })
+
+    local modes = { "Toggle", "Hold", "Always" }
+    local optBtns = {}
+
+    local function rebuild()
+        for _, b in ipairs(optBtns) do b:Destroy() end
+        optBtns = {}
+        for i, mode in ipairs(modes) do
+            local active = element.Mode == mode
+            local mb = Library._createInstance("TextButton", {
+                Position = UDim2.fromOffset(4, 4 + (i - 1) * 24),
+                Size = UDim2.new(1, -8, 0, 22),
+                BackgroundColor3 = Library.Theme.Element,
+                BackgroundTransparency = active and 0 or 1,
+                BorderSizePixel = 0,
+                Text = "",
+                AutoButtonColor = false,
+                ZIndex = 251,
+                Parent = menu,
+            })
+            Library._corner(mb, 4)
+
+            local ind = Library._createInstance("Frame", {
+                Position = UDim2.new(0, 6, 0.5, -5),
+                Size = UDim2.new(0, 3, 0, 10),
+                BackgroundColor3 = Library.Theme.Accent,
+                BackgroundTransparency = active and 0 or 1,
+                BorderSizePixel = 0,
+                ZIndex = 252,
+                Parent = mb,
+            })
+            Library._corner(ind, 2)
+            Library:AddToRegistry(ind, { BackgroundColor3 = "Accent" })
+
+            Library._createInstance("TextLabel", {
+                Position = UDim2.new(0, 16, 0, 0),
+                Size = UDim2.new(1, -22, 1, 0),
+                BackgroundTransparency = 1,
+                Text = mode,
+                TextColor3 = active and Library.Theme.Text or Library.Theme.TextDim,
+                Font = Enum.Font.Gotham,
+                TextSize = 11,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                ZIndex = 252,
+                Parent = mb,
+            })
+
+            mb.MouseEnter:Connect(function()
+                if not active then Library._tween(mb, 0.1, { BackgroundTransparency = 0.5 }) end
+            end)
+            mb.MouseLeave:Connect(function()
+                if not active then Library._tween(mb, 0.1, { BackgroundTransparency = 1 }) end
+            end)
+
+            mb.MouseButton1Click:Connect(function()
+                element.Mode = mode
+                if mode ~= "Toggle" then element.Toggled = false end
+                if mode ~= "Hold" then element.Holding = false end
+                if mode == "Always" then element.Toggled = true end
+                menu.Visible = false
+                Library:AttemptSave()
+                rebuild()
+            end)
+            table.insert(optBtns, mb)
+        end
+    end
+
+    btn.MouseButton2Click:Connect(function()
+        if menu.Visible then menu.Visible = false; return end
+        rebuild()
+        local ap, as = btn.AbsolutePosition, btn.AbsoluteSize
+        menu.Position = UDim2.fromOffset(ap.X + as.X - 110, ap.Y + as.Y + 4)
+        menu.Visible = true
+    end)
+
+    Library:Connect(game:GetService("UserInputService").InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.Touch then
+            if menu.Visible then
+                local mp = input.Position
+                local pp, ps = menu.AbsolutePosition, menu.AbsoluteSize
+                local bp, bs = btn.AbsolutePosition, btn.AbsoluteSize
+                local inMenu = mp.X >= pp.X and mp.X <= pp.X + ps.X and mp.Y >= pp.Y and mp.Y <= pp.Y + ps.Y
+                local inBtn = mp.X >= bp.X and mp.X <= bp.X + bs.X and mp.Y >= bp.Y and mp.Y <= bp.Y + bs.Y
+                if not inMenu and not inBtn then menu.Visible = false end
+            end
+        end
+    end)
+end
+
+task.defer(function()
+    for _, opt in pairs(Library.Options) do
+        if opt.Type == "KeyPicker" and not opt.NoUI then
+            Library:_AttachKeyPickerMenu(opt)
+        end
+    end
+end)
 return Library
