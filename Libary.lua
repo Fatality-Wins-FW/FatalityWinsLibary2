@@ -40,18 +40,34 @@ Library.RegistryMap        = {}
 Library.NotifySide         = "Right"
 Library.Toggled            = true
 Library.Unloaded           = false
-Library.MinSize            = Vector2.new(900, 560)
-Library.MaxSize            = Vector2.new(1280, 760)
-Library.DefaultSize        = Vector2.new(1167, 683)
 Library.Title              = "Fatality Wins"
 Library.Subtitle           = "Rivals"
 Library.Version            = "1"
 Library.ToggleKeybind      = { Value = Enum.KeyCode.RightShift }
-Library.IsMobile           = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 Library.OpenedDropdown     = nil
 Library.OpenedColorPicker  = nil
 Library.KeybindListEnabled = false
 Library.WatermarkEnabled   = false
+
+local function detectMobile()
+    local vp = workspace.CurrentCamera.ViewportSize
+    if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then return true end
+    if vp.X < 1000 then return true end
+    return false
+end
+
+Library.IsMobile = detectMobile()
+
+if Library.IsMobile then
+    local vp = workspace.CurrentCamera.ViewportSize
+    Library.MinSize = Vector2.new(320, 280)
+    Library.MaxSize = Vector2.new(vp.X, vp.Y)
+    Library.DefaultSize = Vector2.new(math.min(vp.X - 20, 720), math.min(vp.Y - 40, 480))
+else
+    Library.MinSize = Vector2.new(900, 560)
+    Library.MaxSize = Vector2.new(1280, 760)
+    Library.DefaultSize = Vector2.new(1167, 683)
+end
 
 local function createInstance(class, props)
     local inst = Instance.new(class)
@@ -130,7 +146,11 @@ function Library:Connect(signal, fn)
     return conn
 end
 
-function Library:GiveSignal(c) table.insert(self.Connections, c); return c end
+function Library:GiveSignal(c)
+    table.insert(self.Connections, c)
+    return c
+end
+
 function Library:OnUnload(fn) table.insert(self.UnloadCallbacks, fn) end
 function Library:OnThemeChanged(fn) table.insert(self.ThemeCallbacks, fn) end
 function Library:AddToRegistry(inst, props) self.RegistryMap[inst] = props end
@@ -151,8 +171,11 @@ end
 function Library:ApplyTheme(themeTable)
     for k, v in pairs(themeTable) do
         if self.Theme[k] ~= nil then
-            if typeof(v) == "Color3" then self.Theme[k] = v
-            elseif typeof(v) == "table" then self.Theme[k] = Color3.fromRGB(v[1], v[2], v[3]) end
+            if typeof(v) == "Color3" then
+                self.Theme[k] = v
+            elseif typeof(v) == "table" then
+                self.Theme[k] = Color3.fromRGB(v[1], v[2], v[3])
+            end
         end
     end
     self:UpdateColorsUsingRegistry()
@@ -236,6 +259,11 @@ function Library:CreateWindow(opts)
     self.Footer   = opts.Footer or ("v" .. tostring(self.Version) .. " - Development Build")
     if opts.NotifySide then self.NotifySide = opts.NotifySide end
 
+    local isMobile = self.IsMobile
+    local sidebarWidth = isMobile and 110 or 170
+    local topbarHeight = isMobile and 48 or 56
+    local logoSize = isMobile and 26 or 32
+
     local parentGui = CoreGui
     if not pcall(function() return CoreGui:GetChildren() end) then
         parentGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -272,7 +300,7 @@ function Library:CreateWindow(opts)
         Name = "NotifyContainer",
         AnchorPoint = Vector2.new(1, 0),
         Position = UDim2.new(1, -20, 0, 20),
-        Size = UDim2.new(0, 300, 1, -40),
+        Size = UDim2.new(0, isMobile and 240 or 300, 1, -40),
         BackgroundTransparency = 1,
         Parent = notifyGui,
     })
@@ -298,7 +326,7 @@ function Library:CreateWindow(opts)
 
     local sidebar = createInstance("Frame", {
         Name = "Sidebar",
-        Size = UDim2.new(0, 170, 1, 0),
+        Size = UDim2.new(0, sidebarWidth, 1, 0),
         BackgroundColor3 = self.Theme.Sidebar,
         BorderSizePixel = 0,
         Parent = main,
@@ -327,14 +355,14 @@ function Library:CreateWindow(opts)
 
     local logoArea = createInstance("Frame", {
         Name = "LogoArea",
-        Size = UDim2.new(1, 0, 0, 64),
+        Size = UDim2.new(1, 0, 0, isMobile and 56 or 64),
         BackgroundTransparency = 1,
         Parent = sidebar,
     })
 
     local logoBox = createInstance("Frame", {
-        Position = UDim2.new(0, 14, 0, 16),
-        Size = UDim2.new(0, 32, 0, 32),
+        Position = UDim2.new(0, 10, 0, 14),
+        Size = UDim2.new(0, logoSize, 0, logoSize),
         BackgroundColor3 = self.Theme.Accent,
         BorderSizePixel = 0,
         Parent = logoArea,
@@ -348,44 +376,46 @@ function Library:CreateWindow(opts)
         Text = "FW",
         TextColor3 = Color3.new(1, 1, 1),
         Font = Enum.Font.GothamBold,
-        TextSize = 13,
+        TextSize = isMobile and 11 or 13,
         Parent = logoBox,
     })
 
     local titleLbl = createInstance("TextLabel", {
-        Position = UDim2.new(0, 54, 0, 16),
-        Size = UDim2.new(1, -64, 0, 16),
+        Position = UDim2.new(0, 10 + logoSize + 8, 0, 14),
+        Size = UDim2.new(1, -(logoSize + 28), 0, 16),
         BackgroundTransparency = 1,
         Text = self.Title,
         TextColor3 = self.Theme.Text,
         Font = Enum.Font.GothamBold,
-        TextSize = 13,
+        TextSize = isMobile and 11 or 13,
         TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = logoArea,
     })
     self:AddToRegistry(titleLbl, { TextColor3 = "Text" })
 
     local subtitleLbl = createInstance("TextLabel", {
-        Position = UDim2.new(0, 54, 0, 32),
-        Size = UDim2.new(1, -64, 0, 14),
+        Position = UDim2.new(0, 10 + logoSize + 8, 0, 30),
+        Size = UDim2.new(1, -(logoSize + 28), 0, 14),
         BackgroundTransparency = 1,
         Text = self.Subtitle,
         TextColor3 = self.Theme.TextDim,
         Font = Enum.Font.Gotham,
-        TextSize = 11,
+        TextSize = isMobile and 9 or 11,
         TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = logoArea,
     })
     self:AddToRegistry(subtitleLbl, { TextColor3 = "TextDim" })
 
     local navLabel = createInstance("TextLabel", {
-        Position = UDim2.new(0, 16, 0, 72),
-        Size = UDim2.new(1, -32, 0, 14),
+        Position = UDim2.new(0, 12, 0, isMobile and 62 or 72),
+        Size = UDim2.new(1, -24, 0, 14),
         BackgroundTransparency = 1,
         Text = "NAVIGATION",
         TextColor3 = self.Theme.TextMuted,
         Font = Enum.Font.GothamBold,
-        TextSize = 10,
+        TextSize = isMobile and 9 or 10,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = sidebar,
     })
@@ -393,8 +423,8 @@ function Library:CreateWindow(opts)
 
     local tabList = createInstance("ScrollingFrame", {
         Name = "TabList",
-        Position = UDim2.new(0, 8, 0, 94),
-        Size = UDim2.new(1, -16, 1, -200),
+        Position = UDim2.new(0, 6, 0, isMobile and 82 or 94),
+        Size = UDim2.new(1, -12, 1, isMobile and -180 or -200),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ScrollBarThickness = 0,
@@ -408,14 +438,15 @@ function Library:CreateWindow(opts)
 
     local versionLbl = createInstance("TextLabel", {
         AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.new(0, 16, 1, -16),
-        Size = UDim2.new(1, -32, 0, 14),
+        Position = UDim2.new(0, 12, 1, -14),
+        Size = UDim2.new(1, -24, 0, 14),
         BackgroundTransparency = 1,
         Text = self.Footer,
         TextColor3 = self.Theme.TextMuted,
         Font = Enum.Font.Gotham,
-        TextSize = 11,
+        TextSize = isMobile and 9 or 11,
         TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = sidebar,
     })
     self:AddToRegistry(versionLbl, { TextColor3 = "TextMuted" })
@@ -423,8 +454,8 @@ function Library:CreateWindow(opts)
 
     local topbar = createInstance("Frame", {
         Name = "Topbar",
-        Position = UDim2.new(0, 170, 0, 0),
-        Size = UDim2.new(1, -170, 0, 56),
+        Position = UDim2.new(0, sidebarWidth, 0, 0),
+        Size = UDim2.new(1, -sidebarWidth, 0, topbarHeight),
         BackgroundColor3 = self.Theme.Topbar,
         BorderSizePixel = 0,
         Parent = main,
@@ -452,14 +483,15 @@ function Library:CreateWindow(opts)
     self:AddToRegistry(topbarDivider, { BackgroundColor3 = "ElementBorder" })
 
     local breadcrumb = createInstance("TextLabel", {
-        Position = UDim2.new(0, 20, 0, 0),
+        Position = UDim2.new(0, isMobile and 12 or 20, 0, 0),
         Size = UDim2.new(0.5, -20, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
         TextColor3 = self.Theme.Text,
         Font = Enum.Font.GothamMedium,
-        TextSize = 13,
+        TextSize = isMobile and 11 or 13,
         TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = topbar,
     })
     self:AddToRegistry(breadcrumb, { TextColor3 = "Text" })
@@ -467,8 +499,8 @@ function Library:CreateWindow(opts)
 
     local statusPill = createInstance("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -60, 0.5, 0),
-        Size = UDim2.new(0, 130, 0, 28),
+        Position = UDim2.new(1, isMobile and -44 or -60, 0.5, 0),
+        Size = UDim2.new(0, isMobile and 100 or 130, 0, isMobile and 24 or 28),
         BackgroundColor3 = self.Theme.Element,
         BorderSizePixel = 0,
         Parent = topbar,
@@ -477,7 +509,7 @@ function Library:CreateWindow(opts)
     self:AddToRegistry(statusPill, { BackgroundColor3 = "Element" })
 
     local statusDot = createInstance("Frame", {
-        Position = UDim2.new(0, 10, 0.5, -3),
+        Position = UDim2.new(0, 8, 0.5, -3),
         Size = UDim2.new(0, 6, 0, 6),
         BackgroundColor3 = self.Theme.Success,
         BorderSizePixel = 0,
@@ -487,40 +519,40 @@ function Library:CreateWindow(opts)
     self:AddToRegistry(statusDot, { BackgroundColor3 = "Success" })
 
     createInstance("TextLabel", {
-        Position = UDim2.new(0, 22, 0, 0),
+        Position = UDim2.new(0, 18, 0, 0),
         Size = UDim2.new(0, 50, 1, 0),
         BackgroundTransparency = 1,
         Text = "Active",
         TextColor3 = self.Theme.Text,
         Font = Enum.Font.GothamMedium,
-        TextSize = 11,
+        TextSize = isMobile and 10 or 11,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = statusPill,
     })
 
     createInstance("TextLabel", {
         AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -10, 0, 0),
-        Size = UDim2.new(0, 50, 1, 0),
+        Position = UDim2.new(1, -8, 0, 0),
+        Size = UDim2.new(0, 40, 1, 0),
         BackgroundTransparency = 1,
         Text = "v" .. tostring(self.Version),
         TextColor3 = self.Theme.TextDim,
         Font = Enum.Font.Gotham,
-        TextSize = 11,
+        TextSize = isMobile and 10 or 11,
         TextXAlignment = Enum.TextXAlignment.Right,
         Parent = statusPill,
     })
 
     local gear = createInstance("TextButton", {
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -20, 0.5, 0),
-        Size = UDim2.new(0, 28, 0, 28),
+        Position = UDim2.new(1, -10, 0.5, 0),
+        Size = UDim2.new(0, isMobile and 24 or 28, 0, isMobile and 24 or 28),
         BackgroundColor3 = self.Theme.Element,
         BorderSizePixel = 0,
         Text = "⚙",
         TextColor3 = self.Theme.Text,
         Font = Enum.Font.GothamBold,
-        TextSize = 16,
+        TextSize = isMobile and 14 or 16,
         AutoButtonColor = false,
         Parent = topbar,
     })
@@ -535,8 +567,8 @@ function Library:CreateWindow(opts)
 
     local content = createInstance("Frame", {
         Name = "Content",
-        Position = UDim2.new(0, 170, 0, 56),
-        Size = UDim2.new(1, -170, 1, -56),
+        Position = UDim2.new(0, sidebarWidth, 0, topbarHeight),
+        Size = UDim2.new(1, -sidebarWidth, 1, -topbarHeight),
         BackgroundTransparency = 1,
         ClipsDescendants = true,
         Parent = main,
@@ -546,12 +578,12 @@ function Library:CreateWindow(opts)
     local resizeHandle = createInstance("TextButton", {
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, -2, 1, -2),
-        Size = UDim2.new(0, 16, 0, 16),
+        Size = UDim2.new(0, 20, 0, 20),
         BackgroundTransparency = 1,
         Text = "◢",
         TextColor3 = self.Theme.TextMuted,
         Font = Enum.Font.GothamBold,
-        TextSize = 12,
+        TextSize = isMobile and 14 or 12,
         AutoButtonColor = false,
         Parent = main,
     })
@@ -589,7 +621,7 @@ function Library:CreateWindow(opts)
         Position = UDim2.new(0, 10, 0, 10),
         Size = UDim2.new(0, 80, 0, 80),
         BackgroundTransparency = 1,
-        Visible = self.IsMobile,
+        Visible = isMobile,
         Parent = mobileGui,
     })
     listLayout(mobileFrame, 6, Enum.FillDirection.Vertical, Enum.HorizontalAlignment.Center)
@@ -709,9 +741,10 @@ end
 function Library:AddTab(name)
     local tab = {}
     tab.Name = name
+    local isMobile = self.IsMobile
 
     local btn = createInstance("TextButton", {
-        Size = UDim2.new(1, 0, 0, 32),
+        Size = UDim2.new(1, 0, 0, isMobile and 30 or 32),
         BackgroundColor3 = self.Theme.Element,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
@@ -733,14 +766,15 @@ function Library:AddTab(name)
     self:AddToRegistry(indicator, { BackgroundColor3 = "Accent" })
 
     local label = createInstance("TextLabel", {
-        Position = UDim2.new(0, 14, 0, 0),
-        Size = UDim2.new(1, -20, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -18, 1, 0),
         BackgroundTransparency = 1,
         Text = name,
         TextColor3 = self.Theme.TextDim,
         Font = Enum.Font.GothamMedium,
-        TextSize = 12,
+        TextSize = isMobile and 11 or 12,
         TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = btn,
     })
 
@@ -762,19 +796,19 @@ function Library:AddTab(name)
     })
 
     local moduleArea = createInstance("Frame", {
-        Position = UDim2.new(1, -160, 0, 8),
-        Size = UDim2.new(0, 150, 0, 26),
+        Position = UDim2.new(1, isMobile and -130 or -160, 0, 8),
+        Size = UDim2.new(0, isMobile and 120 or 150, 0, 26),
         BackgroundTransparency = 1,
         Parent = page,
     })
 
     local moduleLbl = createInstance("TextLabel", {
-        Size = UDim2.new(1, -44, 1, 0),
+        Size = UDim2.new(1, -42, 1, 0),
         BackgroundTransparency = 1,
         Text = "Module enabled",
         TextColor3 = self.Theme.TextDim,
         Font = Enum.Font.Gotham,
-        TextSize = 12,
+        TextSize = isMobile and 10 or 12,
         TextXAlignment = Enum.TextXAlignment.Right,
         Parent = moduleArea,
     })
@@ -783,7 +817,7 @@ function Library:AddTab(name)
     local modSwitch = createInstance("TextButton", {
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, 0, 0.5, 0),
-        Size = UDim2.new(0, 36, 0, 20),
+        Size = UDim2.new(0, 34, 0, 20),
         BackgroundColor3 = self.Theme.Element,
         BorderSizePixel = 0,
         Text = "",
@@ -802,17 +836,18 @@ function Library:AddTab(name)
     corner(modKnob, 7)
 
     local scroll = createInstance("ScrollingFrame", {
-        Position = UDim2.new(0, 0, 0, 44),
-        Size = UDim2.new(1, 0, 1, -44),
+        Position = UDim2.new(0, 0, 0, 40),
+        Size = UDim2.new(1, 0, 1, -40),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        ScrollBarThickness = 4,
+        ScrollBarThickness = isMobile and 6 or 4,
         ScrollBarImageColor3 = self.Theme.Accent,
         CanvasSize = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
         Parent = page,
     })
-    padding(scroll, 4, 16, 16, 16)
+    padding(scroll, 4, isMobile and 10 or 16, isMobile and 10 or 16, isMobile and 10 or 16)
 
     local columns = createInstance("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
@@ -821,8 +856,12 @@ function Library:AddTab(name)
         Parent = scroll,
     })
 
+    if isMobile then
+        listLayout(columns, 10, Enum.FillDirection.Vertical, Enum.HorizontalAlignment.Center)
+    end
+
     local left = createInstance("Frame", {
-        Size = UDim2.new(0.5, -6, 0, 0),
+        Size = isMobile and UDim2.new(1, 0, 0, 0) or UDim2.new(0.5, -6, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
         Parent = columns,
@@ -830,8 +869,8 @@ function Library:AddTab(name)
     listLayout(left, 10)
 
     local right = createInstance("Frame", {
-        Position = UDim2.new(0.5, 6, 0, 0),
-        Size = UDim2.new(0.5, -6, 0, 0),
+        Position = isMobile and UDim2.new(0, 0, 0, 0) or UDim2.new(0.5, 6, 0, 0),
+        Size = isMobile and UDim2.new(1, 0, 0, 0) or UDim2.new(0.5, -6, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
         Parent = columns,
@@ -851,8 +890,8 @@ function Library:AddTab(name)
 
     local overlay = createInstance("TextButton", {
         Name = "ModuleOverlay",
-        Position = UDim2.new(0, 0, 0, 44),
-        Size = UDim2.new(1, 0, 1, -44),
+        Position = UDim2.new(0, 0, 0, 40),
+        Size = UDim2.new(1, 0, 1, -40),
         BackgroundColor3 = self.Theme.Background,
         BackgroundTransparency = 0.35,
         BorderSizePixel = 0,
@@ -867,7 +906,7 @@ function Library:AddTab(name)
     local msgBox = createInstance("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 0),
-        Size = UDim2.new(0, 320, 0, 80),
+        Size = UDim2.new(0, isMobile and 260 or 320, 0, 80),
         BackgroundColor3 = self.Theme.Groupbox,
         BorderSizePixel = 0,
         ZIndex = 101,
@@ -878,26 +917,26 @@ function Library:AddTab(name)
     self:AddToRegistry(msgBox, { BackgroundColor3 = "Groupbox" })
 
     local mt = createInstance("TextLabel", {
-        Position = UDim2.new(0, 0, 0, 14),
+        Position = UDim2.new(0, 0, 0, 12),
         Size = UDim2.new(1, 0, 0, 18),
         BackgroundTransparency = 1,
         Text = "Module Disabled",
         TextColor3 = self.Theme.Text,
         Font = Enum.Font.GothamBold,
-        TextSize = 14,
+        TextSize = isMobile and 13 or 14,
         ZIndex = 102,
         Parent = msgBox,
     })
     self:AddToRegistry(mt, { TextColor3 = "Text" })
 
     local ms = createInstance("TextLabel", {
-        Position = UDim2.new(0, 0, 0, 36),
-        Size = UDim2.new(1, 0, 0, 32),
+        Position = UDim2.new(0, 8, 0, 34),
+        Size = UDim2.new(1, -16, 0, 36),
         BackgroundTransparency = 1,
         Text = "Enable this module using the toggle in the top-right corner.",
         TextColor3 = self.Theme.TextDim,
         Font = Enum.Font.Gotham,
-        TextSize = 11,
+        TextSize = isMobile and 10 or 11,
         TextWrapped = true,
         ZIndex = 102,
         Parent = msgBox,
@@ -945,21 +984,21 @@ function Library:_CreateGroupbox(parent, name, parentTab)
     self:AddToRegistry(frame, { BackgroundColor3 = "Groupbox" })
 
     local headerLbl = createInstance("TextLabel", {
-        Position = UDim2.new(0, 14, 0, 0),
-        Size = UDim2.new(1, -28, 0, 32),
+        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -24, 0, 32),
         BackgroundTransparency = 1,
         Text = name,
         TextColor3 = self.Theme.Text,
         Font = Enum.Font.GothamBold,
-        TextSize = 13,
+        TextSize = self.IsMobile and 12 or 13,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = frame,
     })
     self:AddToRegistry(headerLbl, { TextColor3 = "Text" })
 
     local headerLine = createInstance("Frame", {
-        Position = UDim2.new(0, 14, 0, 32),
-        Size = UDim2.new(1, -28, 0, 1),
+        Position = UDim2.new(0, 12, 0, 32),
+        Size = UDim2.new(1, -24, 0, 1),
         BackgroundColor3 = self.Theme.Divider,
         BorderSizePixel = 0,
         Parent = frame,
@@ -973,7 +1012,7 @@ function Library:_CreateGroupbox(parent, name, parentTab)
         BackgroundTransparency = 1,
         Parent = frame,
     })
-    padding(body, 10, 14, 12, 14)
+    padding(body, 10, 12, 12, 12)
 
     local container = createInstance("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
@@ -1029,7 +1068,7 @@ function Library:_CreateTabbox(parent, parentTab)
         BackgroundTransparency = 1,
         Parent = frame,
     })
-    padding(body, 8, 14, 12, 14)
+    padding(body, 8, 12, 12, 12)
 
     function tabbox:AddTab(name)
         local sub = { Name = name }
@@ -1048,7 +1087,7 @@ function Library:_CreateTabbox(parent, parentTab)
             Text = "  " .. name .. "  ",
             TextColor3 = Library.Theme.TextDim,
             Font = Enum.Font.GothamMedium,
-            TextSize = 12,
+            TextSize = Library.IsMobile and 11 or 12,
             Parent = tabBtn,
         })
         local underline = createInstance("Frame", {
@@ -1102,6 +1141,8 @@ function Library:_CreateTabbox(parent, parentTab)
 end
 
 function Library:_AttachElements(host)
+    local isMobile = self.IsMobile
+    local elemTextSize = isMobile and 11 or 12
 
     function host:AddLabel(text, doesWrap)
         local element = {}
@@ -1117,7 +1158,7 @@ function Library:_AttachElements(host)
             Text = text or "",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextYAlignment = doesWrap and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
             TextWrapped = doesWrap or false,
@@ -1147,7 +1188,7 @@ function Library:_AttachElements(host)
         if type(opts) == "string" then opts = { Text = opts, Func = fn } end
         opts = opts or {}
         local element = {}
-        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, Parent = host._Container })
+        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, isMobile and 28 or 26), BackgroundTransparency = 1, Parent = host._Container })
         local btn = createInstance("TextButton", {
             Size = UDim2.new(1, 0, 1, 0),
             BackgroundColor3 = Library.Theme.Element,
@@ -1155,7 +1196,7 @@ function Library:_AttachElements(host)
             Text = opts.Text or "Button",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.GothamMedium,
-            TextSize = 12,
+            TextSize = elemTextSize,
             AutoButtonColor = false,
             Parent = container,
         })
@@ -1195,14 +1236,14 @@ function Library:_AttachElements(host)
     function host:AddToggle(idx, opts)
         opts = opts or {}
         local element = { Type = "Toggle", Idx = idx, Value = opts.Default or false, Callbacks = {} }
-        local row = createInstance("Frame", { Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, Parent = host._Container })
+        local row = createInstance("Frame", { Size = UDim2.new(1, 0, 0, isMobile and 24 or 22), BackgroundTransparency = 1, Parent = host._Container })
         local txt = createInstance("TextLabel", {
             Size = UDim2.new(1, -120, 1, 0),
             BackgroundTransparency = 1,
             Text = opts.Text or idx or "Toggle",
             TextColor3 = opts.Risky and Library.Theme.Danger or Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = row,
         })
@@ -1273,21 +1314,21 @@ function Library:_AttachElements(host)
     function host:AddInput(idx, opts)
         opts = opts or {}
         local element = { Type = "Input", Idx = idx, Value = opts.Default or "", Callbacks = {} }
-        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, Parent = host._Container })
+        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, isMobile and 40 or 36), BackgroundTransparency = 1, Parent = host._Container })
         local lbl = createInstance("TextLabel", {
             Size = UDim2.new(1, 0, 0, 14),
             BackgroundTransparency = 1,
             Text = opts.Text or idx or "Input",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = container,
         })
         Library:AddToRegistry(lbl, { TextColor3 = "Text" })
         local box = createInstance("Frame", {
             Position = UDim2.new(0, 0, 0, 16),
-            Size = UDim2.new(1, 0, 0, 20),
+            Size = UDim2.new(1, 0, 0, isMobile and 22 or 20),
             BackgroundColor3 = Library.Theme.Element,
             BorderSizePixel = 0,
             Parent = container,
@@ -1304,7 +1345,7 @@ function Library:_AttachElements(host)
             PlaceholderColor3 = Library.Theme.TextMuted,
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 11,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             ClearTextOnFocus = false,
             Parent = box,
@@ -1367,14 +1408,14 @@ function Library:_AttachElements(host)
             return math.floor(v * m + 0.5) / m
         end
 
-        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, Parent = host._Container })
+        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, isMobile and 36 or 34), BackgroundTransparency = 1, Parent = host._Container })
         local lbl = createInstance("TextLabel", {
             Size = UDim2.new(1, -100, 0, 14),
             BackgroundTransparency = 1,
             Text = opts.Text or idx or "Slider",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = container,
         })
@@ -1387,14 +1428,14 @@ function Library:_AttachElements(host)
             Text = "",
             TextColor3 = Library.Theme.TextDim,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Right,
             Parent = container,
         })
         Library:AddToRegistry(valLbl, { TextColor3 = "TextDim" })
         local barBg = createInstance("Frame", {
             Position = UDim2.new(0, 0, 0, 20),
-            Size = UDim2.new(1, 0, 0, 8),
+            Size = UDim2.new(1, 0, 0, isMobile and 10 or 8),
             BackgroundColor3 = Library.Theme.Element,
             BorderSizePixel = 0,
             Parent = container,
@@ -1411,8 +1452,8 @@ function Library:_AttachElements(host)
         corner(fill, 4)
         Library:AddToRegistry(fill, { BackgroundColor3 = "Accent" })
         local hitbox = createInstance("TextButton", {
-            Size = UDim2.new(1, 0, 1, 14),
-            Position = UDim2.new(0, 0, 0, -7),
+            Size = UDim2.new(1, 0, 1, isMobile and 20 or 14),
+            Position = UDim2.new(0, 0, 0, isMobile and -10 or -7),
             BackgroundTransparency = 1,
             Text = "",
             AutoButtonColor = false,
@@ -1488,21 +1529,21 @@ function Library:_AttachElements(host)
             element.Value = opts.Default
         end
 
-        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, Parent = host._Container })
+        local container = createInstance("Frame", { Size = UDim2.new(1, 0, 0, isMobile and 40 or 36), BackgroundTransparency = 1, Parent = host._Container })
         local lbl = createInstance("TextLabel", {
             Size = UDim2.new(1, 0, 0, 14),
             BackgroundTransparency = 1,
             Text = opts.Text or idx or "Dropdown",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = container,
         })
         Library:AddToRegistry(lbl, { TextColor3 = "Text" })
         local btn = createInstance("TextButton", {
             Position = UDim2.new(0, 0, 0, 16),
-            Size = UDim2.new(1, 0, 0, 20),
+            Size = UDim2.new(1, 0, 0, isMobile and 22 or 20),
             BackgroundColor3 = Library.Theme.Element,
             BorderSizePixel = 0,
             Text = "",
@@ -1519,7 +1560,7 @@ function Library:_AttachElements(host)
             Text = "",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 11,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
             Parent = btn,
@@ -1588,7 +1629,7 @@ function Library:_AttachElements(host)
             for _, val in ipairs(element.Values) do
                 local sv = tostring(val)
                 local ob = createInstance("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 22),
+                    Size = UDim2.new(1, 0, 0, isMobile and 26 or 22),
                     BackgroundColor3 = Library.Theme.Element,
                     BackgroundTransparency = isSel(val) and 0 or 1,
                     BorderSizePixel = 0,
@@ -1616,7 +1657,7 @@ function Library:_AttachElements(host)
                     Text = sv,
                     TextColor3 = isSel(val) and Library.Theme.Text or Library.Theme.TextDim,
                     Font = Enum.Font.Gotham,
-                    TextSize = 11,
+                    TextSize = elemTextSize,
                     TextXAlignment = Enum.TextXAlignment.Left,
                     ZIndex = 153,
                     Parent = ob,
@@ -1644,7 +1685,7 @@ function Library:_AttachElements(host)
             if Library.OpenedDropdown and Library.OpenedDropdown ~= element then Library.OpenedDropdown:Close() end
             Library.OpenedDropdown = element
             local ap, as = btn.AbsolutePosition, btn.AbsoluteSize
-            local h = math.min(180, #element.Values * 24 + 8)
+            local h = math.min(180, #element.Values * (isMobile and 28 or 24) + 8)
             popup.Position = UDim2.fromOffset(ap.X, ap.Y + as.Y + 4)
             popup.Size = UDim2.fromOffset(as.X, h)
             popup.Visible = true; arrow.Text = "^"
@@ -1732,6 +1773,8 @@ function Library:_BuildColorPicker(parentRow, idx, opts, standalone)
     }
     local h, s, v = Color3.toHSV(element.Value)
     element._H, element._S, element._V = h, s, v
+    local isMobile = self.IsMobile
+    local elemTextSize = isMobile and 11 or 12
 
     local row = parentRow
     if standalone then
@@ -1742,7 +1785,7 @@ function Library:_BuildColorPicker(parentRow, idx, opts, standalone)
             Text = opts.Text or opts.Title or idx or "Color",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = row,
         })
@@ -1978,6 +2021,8 @@ function Library:_BuildKeyPicker(parentRow, parentElement, idx, opts, standalone
         Callbacks = {}, ChangedCallbacks = {},
         Toggled = false, Holding = false,
     }
+    local isMobile = self.IsMobile
+    local elemTextSize = isMobile and 11 or 12
 
     local row = parentRow
     if standalone then
@@ -1988,7 +2033,7 @@ function Library:_BuildKeyPicker(parentRow, parentElement, idx, opts, standalone
             Text = opts.Text or idx or "Keybind",
             TextColor3 = Library.Theme.Text,
             Font = Enum.Font.Gotham,
-            TextSize = 12,
+            TextSize = elemTextSize,
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = row,
         })
@@ -2131,12 +2176,8 @@ function Library:_BuildKeyPicker(parentRow, parentElement, idx, opts, standalone
                     ZIndex = 252,
                     Parent = mb,
                 })
-                mb.MouseEnter:Connect(function()
-                    if not active then tween(mb, 0.1, { BackgroundTransparency = 0.5 }) end
-                end)
-                mb.MouseLeave:Connect(function()
-                    if not active then tween(mb, 0.1, { BackgroundTransparency = 1 }) end
-                end)
+                mb.MouseEnter:Connect(function() if not active then tween(mb, 0.1, { BackgroundTransparency = 0.5 }) end end)
+                mb.MouseLeave:Connect(function() if not active then tween(mb, 0.1, { BackgroundTransparency = 1 }) end end)
                 mb.MouseButton1Click:Connect(function()
                     element.Mode = mode
                     if mode ~= "Toggle" then element.Toggled = false end
@@ -2360,11 +2401,11 @@ function Library:_PinSettingsToBottom()
     local btn = self._SettingsTab._Button
     btn.Parent = self.Sidebar
     btn.AnchorPoint = Vector2.new(0, 1)
-    btn.Position = UDim2.new(0, 8, 1, -70)
-    btn.Size = UDim2.new(1, -16, 0, 32)
+    btn.Position = UDim2.new(0, 6, 1, self.IsMobile and -60 or -70)
+    btn.Size = UDim2.new(1, -12, 0, self.IsMobile and 30 or 32)
     local div = createInstance("Frame", {
-        AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -108),
-        Size = UDim2.new(1, -32, 0, 1), BackgroundColor3 = self.Theme.Divider,
+        AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, self.IsMobile and -96 or -108),
+        Size = UDim2.new(1, -24, 0, 1), BackgroundColor3 = self.Theme.Divider,
         BorderSizePixel = 0, Parent = self.Sidebar,
     })
     self:AddToRegistry(div, { BackgroundColor3 = "Divider" })
@@ -2384,37 +2425,5 @@ local env = getgenv()
 env.Toggles = Library.Toggles
 env.Options = Library.Options
 env.Library = Library
-
-task.defer(function()
-    for _, opt in pairs(Library.Options) do
-        if opt.Type == "ColorPicker" and opt._Btn then
-            opt._Btn.AnchorPoint = Vector2.new(1, 0.5)
-            opt._Btn.Position = UDim2.new(1, -6, 0.5, 0)
-        end
-    end
-
-    for _, page in ipairs(Library.ContentFrame:GetChildren()) do
-        if page:IsA("CanvasGroup") then
-            for _, scroll in ipairs(page:GetChildren()) do
-                if scroll:IsA("ScrollingFrame") then
-                    for _, columns in ipairs(scroll:GetChildren()) do
-                        if columns:IsA("Frame") then
-                            for _, col in ipairs(columns:GetChildren()) do
-                                if col:IsA("Frame") then
-                                    for _, gb in ipairs(col:GetChildren()) do
-                                        if gb:IsA("Frame") then
-                                            gb.ClipsDescendants = true
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
-
 
 return Library
