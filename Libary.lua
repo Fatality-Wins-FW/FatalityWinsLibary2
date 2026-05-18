@@ -3224,11 +3224,12 @@ function Library:_RefreshKeybindList()
     self.KeybindFrame.Visible = count > 0
 end
 
-function Library:BuildSettingsTab()
+function Library:_BuildSettingsTabInternal()
     if self._SettingsTab then return self._SettingsTab end
 
     local tab = self:AddTab("Settings")
     self._SettingsTab = tab
+    self._SettingsTabBtn = tab._Button
 
     local left = tab:AddLeftGroupbox("Menu")
 
@@ -3248,18 +3249,6 @@ function Library:BuildSettingsTab()
             local enumKey = Enum.KeyCode[newKey]
             if enumKey then
                 self.ToggleKeybind.Value = enumKey
-            end
-        end,
-    })
-
-    left:AddInput("CustomFooter", {
-        Text = "Footer Text",
-        Default = self.Footer,
-        Placeholder = "v1 - Development Build",
-        Finished = true,
-        Callback = function(v)
-            if v and v ~= "" then
-                self:SetFooter(v)
             end
         end,
     })
@@ -3303,6 +3292,28 @@ function Library:BuildSettingsTab()
     return tab
 end
 
+function Library:_PinSettingsToBottom()
+    if not self._SettingsTabBtn then return end
+    if not self.TabList then return end
+    if not self.Sidebar then return end
+
+    local btn = self._SettingsTabBtn
+    btn.Parent = self.Sidebar
+    btn.AnchorPoint = Vector2.new(0, 1)
+    btn.Position = UDim2.new(0, 8, 1, -70)
+    btn.Size = UDim2.new(1, -16, 0, 34)
+
+    local divider = createInstance("Frame", {
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 16, 1, -110),
+        Size = UDim2.new(1, -32, 0, 1),
+        BackgroundColor3 = self.Theme.Divider,
+        BorderSizePixel = 0,
+        Parent = self.Sidebar,
+    })
+    self:AddToRegistry(divider, { BackgroundColor3 = "Divider" })
+end
+
 local _origCreateWindowFinal = Library.CreateWindow
 function Library:CreateWindow(opts)
     local win = _origCreateWindowFinal(self, opts)
@@ -3317,7 +3328,12 @@ function Library:CreateWindow(opts)
     _patchSharpCorners()
     _replaceMinimizeWithGear()
 
+    self:_BuildSettingsTabInternal()
+    self:_PinSettingsToBottom()
+
     self.CurrentTab = nil
+    self._SettingsTab._Page.Visible = false
+    self._SettingsTab._Page.GroupTransparency = 1
 
     return win
 end
