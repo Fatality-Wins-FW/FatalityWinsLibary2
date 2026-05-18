@@ -3057,6 +3057,10 @@ env.Toggles = Library.Toggles
 env.Options = Library.Options
 env.Library = Library
 
+Library.MinSize = Vector2.new(900, 560)
+Library.MaxSize = Vector2.new(1280, 760)
+Library.DefaultSize = Vector2.new(1167, 683)
+
 local function _patchSharpCorners()
     if not Library.Main then return end
 
@@ -3165,13 +3169,23 @@ function Library:_ToggleMinimize()
         self.Minimized = false
         if self.ContentFrame then self.ContentFrame.Visible = true end
         if self.Sidebar then self.Sidebar.Visible = true end
-        tween(self.Main, 0.25, { Size = self._SavedMainSize or UDim2.new(0, 720, 0, 520) })
+        tween(self.Main, 0.25, { Size = self._SavedMainSize or UDim2.fromOffset(self.DefaultSize.X, self.DefaultSize.Y) })
     else
         self._SavedMainSize = self.Main.Size
         self.Minimized = true
         if self.ContentFrame then self.ContentFrame.Visible = false end
         if self.Sidebar then self.Sidebar.Visible = false end
         tween(self.Main, 0.25, { Size = UDim2.new(0, 260, 0, 56) })
+    end
+end
+
+function Library:_ClampMainSize()
+    if not self.Main then return end
+    local cur = self.Main.AbsoluteSize
+    local newW = math.clamp(cur.X, self.MinSize.X, self.MaxSize.X)
+    local newH = math.clamp(cur.Y, self.MinSize.Y, self.MaxSize.Y)
+    if newW ~= cur.X or newH ~= cur.Y then
+        self.Main.Size = UDim2.fromOffset(newW, newH)
     end
 end
 
@@ -3266,32 +3280,15 @@ function Library:_BuildKeybindList()
     end
 end
 
-function Library:_ApplyUIScale()
-    if not self.Main then return end
-    if self._UIScale then return end
-
-    local scale = Instance.new("UIScale")
-    scale.Scale = 1
-    scale.Parent = self.Main
-    self._UIScale = scale
-
-    local baseW = 720
-    local function update()
-        local currentW = self.Main.AbsoluteSize.X / scale.Scale
-        local newScale = math.clamp(self.Main.AbsoluteSize.X / baseW, 0.85, 1.6)
-        scale.Scale = newScale
-    end
-
-    self.Main:GetPropertyChangedSignal("AbsoluteSize"):Connect(update)
-    update()
-end
-
 function Library:_BuildSettingsTabInternal()
     if self._SettingsTab then return self._SettingsTab end
 
     local tab = self:AddTab("Settings")
     self._SettingsTab = tab
     self._SettingsTabBtn = tab._Button
+
+    tab._IsSettings = true
+    if tab._ModSwitch then tab._ModSwitch.Parent.Visible = false end
 
     local left = tab:AddLeftGroupbox("Menu")
 
@@ -3368,9 +3365,93 @@ function Library:_PinSettingsToBottom()
     self:AddToRegistry(divider, { BackgroundColor3 = "Divider" })
 end
 
+function Library:_HookModuleToggles()
+    for _, tab in ipairs(self.Tabs) do
+        if not tab._IsSettings and tab._ModSwitch and not tab._ModuleHooked then
+            tab._ModuleHooked = true
+            tab._ModuleEnabled = false
+
+            local overlay = createInstance("Frame", {
+                Name = "ModuleOverlay",
+                Position = UDim2.new(0, 0, 0, 44),
+                Size = UDim2.new(1, 0, 1, -44),
+                BackgroundColor3 = self.Theme.Background,
+                BackgroundTransparency = 0.4,
+                BorderSizePixel = 0,
+                ZIndex = 100,
+                Visible = true,
+                Parent = tab._Page,
+            })
+            self:AddToRegistry(overlay, { BackgroundColor3 = "Background" })
+
+            local msgBox = createInstance("Frame", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(0, 320, 0, 80),
+                BackgroundColor3 = self.Theme.Groupbox,
+                BorderSizePixel = 0,
+                ZIndex = 101,
+                Parent = overlay,
+            })
+            corner(msgBox, 8)
+            stroke(msgBox, self.Theme.ElementBorder, 1)
+            self:AddToRegistry(msgBox, { BackgroundColor3 = "Groupbox" })
+
+            local title = createInstance("TextLabel", {
+                Position = UDim2.new(0, 0, 0, 14),
+                Size = UDim2.new(1, 0, 0, 18),
+                BackgroundTransparency = 1,
+                Text = "Module Disabled",
+                TextColor3 = self.Theme.Text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 14,
+                ZIndex = 102,
+                Parent = msgBox,
+            })
+            self:AddToRegistry(title, { TextColor3 = "Text" })
+
+            local sub = createInstance("TextLabel", {
+                Position = UDim2.new(0, 0, 0, 36),
+                Size = UDim2.new(1, 0, 0, 32),
+                BackgroundTransparency = 1,
+                Text = "Enable this module using the toggle in the top-right corner.",
+                TextColor3 = self.Theme.TextDim,
+                Font = Enum.Font.Gotham,
+                TextSize = 11,
+                TextWrapped = true,
+                ZIndex = 102,
+                Parent = msgBox,
+            })
+            self:AddToRegistry(sub, { TextColor3 = "TextDim" })
+
+            tab._ModuleOverlay = overlay
+
+            local origClick = tab._ModSwitch.MouseButton1Click
+            tab._ModSwitch.MouseButton1Click:Connect(function()
+                task.wait()
+                tab._ModuleEnabled = not tab._ModuleEnabled
+                overlay.Visible = not tab._ModuleEnabled
+            end)
+        end
+    end
+end
+
 local _origCreateWindowFinal = Library.CreateWindow
 function Library:CreateWindow(opts)
+    opts = opts or {}
     local win = _origCreateWindowFinal(self, opts)
+
+    if self.Main then
+        self.Main.Size = UDim2.fromOffset(self.DefaultSize.X, self.DefaultSize.Y)
+        local screenSize = workspace.CurrentCamera.ViewportSize
+        self.Main.Position = UDim2.fromOffset(
+            (screenSize.X - self.DefaultSize.X) / 2,
+            (screenSize.Y - self.DefaultSize.Y) / 2
+        )
+        self.Main:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+            self:_ClampMainSize()
+        end)
+    end
 
     for _, desc in ipairs(self.Main:GetDescendants()) do
         if desc:IsA("TextLabel") and desc.Text == self.Footer then
@@ -3381,14 +3462,19 @@ function Library:CreateWindow(opts)
 
     _patchSharpCorners()
     _replaceMinimizeWithGear()
-    self:_ApplyUIScale()
 
     self:_BuildSettingsTabInternal()
     self:_PinSettingsToBottom()
 
+    task.defer(function()
+        self:_HookModuleToggles()
+    end)
+
     self.CurrentTab = nil
-    self._SettingsTab._Page.Visible = false
-    self._SettingsTab._Page.GroupTransparency = 1
+    if self._SettingsTab and self._SettingsTab._Page then
+        self._SettingsTab._Page.Visible = false
+        self._SettingsTab._Page.GroupTransparency = 1
+    end
 
     return win
 end
