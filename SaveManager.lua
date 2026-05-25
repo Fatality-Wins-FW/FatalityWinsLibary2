@@ -9,17 +9,47 @@ SaveManager.IgnoreThemeKeys = false
 SaveManager.AutoloadFile = "autoload.txt"
 SaveManager.CurrentGame = tostring(game.PlaceId)
 
-local function safeRead(p) local ok, c = pcall(readfile, p); if ok then return c end end
-local function safeWrite(p, c) pcall(writefile, p, c) end
-local function safeDelete(p) if delfile then pcall(delfile, p) end end
-local function safeMkdir(p) if makefolder and not (isfolder and isfolder(p)) then pcall(makefolder, p) end end
+local function safeRead(p)
+    if not readfile then return nil end
+    local ok, c = pcall(readfile, p)
+    if ok then return c end
+    return nil
+end
+
+local function safeWrite(p, c)
+    if not writefile then return end
+    pcall(writefile, p, c)
+end
+
+local function safeDelete(p)
+    if delfile then pcall(delfile, p) end
+end
+
+local function safeMkdir(p)
+    if not makefolder then return end
+    local exists = false
+    if isfolder then
+        local ok, result = pcall(isfolder, p)
+        if ok then exists = result end
+    end
+    if not exists then
+        pcall(makefolder, p)
+    end
+end
 
 local THEME_KEYS = {
-    AccentColor = true, BackgroundColor = true, SidebarColor = true,
-    GroupboxColor = true, TextColor = true, ThemePreset = true, ThemeName = true,
+    AccentColor = true,
+    BackgroundColor = true,
+    SidebarColor = true,
+    GroupboxColor = true,
+    TextColor = true,
+    ThemePreset = true,
+    ThemeName = true,
 }
 
-function SaveManager:SetLibrary(lib) self.Library = lib end
+function SaveManager:SetLibrary(lib)
+    self.Library = lib
+end
 
 function SaveManager:SetFolder(name)
     self.Folder = name
@@ -40,7 +70,9 @@ end
 function SaveManager:SetIgnoreIndexes(list)
     self.IgnoreList = {}
     if type(list) == "table" then
-        for _, v in ipairs(list) do self.IgnoreList[v] = true end
+        for _, v in ipairs(list) do
+            self.IgnoreList[v] = true
+        end
     end
 end
 
@@ -49,7 +81,12 @@ function SaveManager:IgnoreThemeSettings()
 end
 
 local function colorToHex(c)
-    return string.format("#%02X%02X%02X", c.R * 255, c.G * 255, c.B * 255)
+    if typeof(c) ~= "Color3" then return "#FFFFFF" end
+    return string.format("#%02X%02X%02X",
+        math.clamp(math.round(c.R * 255), 0, 255),
+        math.clamp(math.round(c.G * 255), 0, 255),
+        math.clamp(math.round(c.B * 255), 0, 255)
+    )
 end
 
 local function hexToColor(hex)
@@ -59,10 +96,13 @@ local function hexToColor(hex)
     local r = tonumber(hex:sub(1, 2), 16)
     local g = tonumber(hex:sub(3, 4), 16)
     local b = tonumber(hex:sub(5, 6), 16)
-    if r and g and b then return Color3.fromRGB(r, g, b) end
+    if r and g and b then
+        return Color3.fromRGB(r, g, b)
+    end
+    return nil
 end
 
-local function shouldIgnore(self, idx)
+function SaveManager:_ShouldIgnore(idx)
     if self.IgnoreList[idx] then return true end
     if idx == "MenuKeybind" then return true end
     if self.IgnoreThemeKeys and THEME_KEYS[idx] then return true end
@@ -72,40 +112,66 @@ end
 function SaveManager:Serialize()
     local data = { Toggles = {}, Options = {} }
 
-    for idx, opt in pairs(self.Library.Toggles) do
-        if not shouldIgnore(self, idx) then
-            data.Toggles[idx] = { Type = "Toggle", Value = opt.Value }
+    if not self.Library then
+        warn("[SaveManager] Library is nil during Serialize")
+        return data
+    end
+
+    if self.Library.Toggles then
+        for idx, opt in pairs(self.Library.Toggles) do
+            if not self:_ShouldIgnore(idx) then
+                data.Toggles[idx] = {
+                    Type = "Toggle",
+                    Value = opt.Value,
+                }
+            end
         end
     end
 
-    for idx, opt in pairs(self.Library.Options) do
-        if not shouldIgnore(self, idx) then
-            if opt.Type == "Slider" then
-                data.Options[idx] = { Type = "Slider", Value = opt.Value }
-            elseif opt.Type == "Input" then
-                data.Options[idx] = { Type = "Input", Value = opt.Value }
-            elseif opt.Type == "Dropdown" then
-                if opt.Multi then
-                    local arr = {}
-                    for k, on in pairs(opt.Value or {}) do
-                        if on then table.insert(arr, k) end
+    if self.Library.Options then
+        for idx, opt in pairs(self.Library.Options) do
+            if not self:_ShouldIgnore(idx) then
+                if opt.Type == "Slider" then
+                    data.Options[idx] = {
+                        Type = "Slider",
+                        Value = opt.Value,
+                    }
+                elseif opt.Type == "Input" then
+                    data.Options[idx] = {
+                        Type = "Input",
+                        Value = opt.Value,
+                    }
+                elseif opt.Type == "Dropdown" then
+                    if opt.Multi then
+                        local arr = {}
+                        for k, on in pairs(opt.Value or {}) do
+                            if on then table.insert(arr, k) end
+                        end
+                        data.Options[idx] = {
+                            Type = "Dropdown",
+                            Multi = true,
+                            Value = arr,
+                        }
+                    else
+                        data.Options[idx] = {
+                            Type = "Dropdown",
+                            Multi = false,
+                            Value = opt.Value,
+                        }
                     end
-                    data.Options[idx] = { Type = "Dropdown", Multi = true, Value = arr }
-                else
-                    data.Options[idx] = { Type = "Dropdown", Multi = false, Value = opt.Value }
+                elseif opt.Type == "ColorPicker" then
+                    data.Options[idx] = {
+                        Type = "ColorPicker",
+                        Value = colorToHex(opt.Value),
+                        Transparency = opt.Transparency or 0,
+                    }
+                elseif opt.Type == "KeyPicker" then
+                    data.Options[idx] = {
+                        Type = "KeyPicker",
+                        Value = opt.Value,
+                        Mode = opt.Mode,
+                    }
                 end
-            elseif opt.Type == "ColorPicker" then
-                data.Options[idx] = {
-                    Type = "ColorPicker",
-                    Value = colorToHex(opt.Value),
-                    Transparency = opt.Transparency or 0,
-                }
-            elseif opt.Type == "KeyPicker" then
-                data.Options[idx] = {
-                    Type = "KeyPicker",
-                    Value = opt.Value,
-                    Mode = opt.Mode,
-                }
             end
         end
     end
@@ -114,37 +180,61 @@ function SaveManager:Serialize()
 end
 
 function SaveManager:Deserialize(data)
-    if type(data) ~= "table" then return end
+    if type(data) ~= "table" then
+        warn("[SaveManager] Deserialize received non-table data")
+        return
+    end
 
-    if data.Toggles then
+    if not self.Library then
+        warn("[SaveManager] Library is nil during Deserialize")
+        return
+    end
+
+    if data.Toggles and self.Library.Toggles then
         for idx, info in pairs(data.Toggles) do
             local el = self.Library.Toggles[idx]
-            if el and el.SetValue then
-                pcall(function() el:SetValue(info.Value, true) end)
+            if el then
+                if el.SetValue then
+                    pcall(function() el:SetValue(info.Value, true) end)
+                end
             end
         end
     end
 
-    if data.Options then
+    if data.Options and self.Library.Options then
         for idx, info in pairs(data.Options) do
             local el = self.Library.Options[idx]
             if el then
                 if info.Type == "ColorPicker" then
                     local c = hexToColor(info.Value)
-                    if c and el.SetValueRGB then
-                        pcall(function() el:SetValueRGB(c, info.Transparency or 0) end)
+                    if c then
+                        if el.SetValueRGB then
+                            pcall(function()
+                                el:SetValueRGB(c, info.Transparency or 0)
+                            end)
+                        elseif el.SetValue then
+                            pcall(function()
+                                el:SetValue(c)
+                            end)
+                        end
                     end
                 elseif info.Type == "KeyPicker" then
                     if el.SetValue then
-                        pcall(function() el:SetValue({ info.Value, info.Mode or el.Mode }) end)
+                        pcall(function()
+                            el:SetValue({ info.Value, info.Mode or el.Mode })
+                        end)
                     end
                 elseif info.Type == "Dropdown" and info.Multi then
                     if el.SetValue then
-                        pcall(function() el:SetValue(info.Value, true) end)
+                        pcall(function()
+                            el:SetValue(info.Value, true)
+                        end)
                     end
                 else
                     if el.SetValue then
-                        pcall(function() el:SetValue(info.Value, true) end)
+                        pcall(function()
+                            el:SetValue(info.Value, true)
+                        end)
                     end
                 end
             end
@@ -153,25 +243,51 @@ function SaveManager:Deserialize(data)
 end
 
 function SaveManager:Save(name)
-    if not name then
+    if not name or name == "" then
         name = self._CurrentConfig or "default"
     end
-    if name == "" then return false end
+
     self:BuildFolderTree()
+
     local data = self:Serialize()
-    local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
-    if not ok then return false end
-    safeWrite(self:GetGamePath() .. "/" .. name .. ".json", encoded)
+    local ok, encoded = pcall(function()
+        return HttpService:JSONEncode(data)
+    end)
+
+    if not ok or not encoded then
+        warn("[SaveManager] JSON encode failed:", encoded)
+        return false
+    end
+
+    local path = self:GetGamePath() .. "/" .. name .. ".json"
+    safeWrite(path, encoded)
+    self._CurrentConfig = name
     return true
 end
 
 function SaveManager:Load(name)
-    if not name or name == "" then return false end
+    if not name or name == "" then
+        warn("[SaveManager] Load called with empty name")
+        return false
+    end
+
     local path = self:GetGamePath() .. "/" .. name .. ".json"
     local content = safeRead(path)
-    if not content then return false end
-    local ok, data = pcall(function() return HttpService:JSONDecode(content) end)
-    if not ok then return false end
+
+    if not content or content == "" then
+        warn("[SaveManager] Could not read file:", path)
+        return false
+    end
+
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(content)
+    end)
+
+    if not ok or type(data) ~= "table" then
+        warn("[SaveManager] JSON decode failed:", data)
+        return false
+    end
+
     self:Deserialize(data)
     self._CurrentConfig = name
     return true
@@ -186,13 +302,20 @@ end
 function SaveManager:GetConfigs()
     local list = {}
     if not listfiles then return list end
+
     self:BuildFolderTree()
+
     local ok, files = pcall(listfiles, self:GetGamePath())
-    if not ok then return list end
+    if not ok or type(files) ~= "table" then return list end
+
     for _, f in ipairs(files) do
         local n = f:match("([^/\\]+)%.json$")
-        if n then table.insert(list, n) end
+        if n then
+            table.insert(list, n)
+        end
     end
+
+    table.sort(list)
     return list
 end
 
@@ -202,33 +325,48 @@ function SaveManager:SetAutoload(name)
 end
 
 function SaveManager:GetAutoload()
-    return safeRead(self.Folder .. "/settings/" .. self.AutoloadFile)
+    local content = safeRead(self.Folder .. "/settings/" .. self.AutoloadFile)
+    if content and content ~= "" then
+        content = content:match("^%s*(.-)%s*$")
+        return content ~= "" and content or nil
+    end
+    return nil
 end
 
 function SaveManager:LoadAutoloadConfig()
     local auto = self:GetAutoload()
-    if auto and auto ~= "" then
-        local ok = self:Load(auto)
-        if ok and self.Library then
-            self.Library:Notify({
-                Title = "Config",
-                Description = "Autoloaded: " .. auto,
-                Time = 3,
-            })
-        end
+    if not auto then return end
+
+    local ok = self:Load(auto)
+    if ok and self.Library then
+        self.Library:Notify({
+            Title = "Config",
+            Description = "Autoloaded: " .. auto,
+            Time = 3,
+        })
     end
 end
 
 function SaveManager:BuildConfigSection(tab)
-    if not self.Library or not tab then return end
+    if not self.Library then
+        warn("[SaveManager] BuildConfigSection: Library is nil")
+        return
+    end
+    if not tab then
+        warn("[SaveManager] BuildConfigSection: tab is nil")
+        return
+    end
 
     local box = tab:AddRightGroupbox("Configuration")
 
+    local configs = self:GetConfigs()
+    local autoloadName = self:GetAutoload()
+
     local configDropdown = box:AddDropdown("ConfigList", {
         Text = "Config",
-        Values = self:GetConfigs(),
+        Values = configs,
         AllowNull = true,
-        Default = self:GetAutoload() or nil,
+        Default = autoloadName or nil,
     })
 
     box:AddDivider()
@@ -237,28 +375,48 @@ function SaveManager:BuildConfigSection(tab)
         Text = "Config Name",
         Placeholder = "default",
         Default = "",
-        Finished = true,
+        Finished = false,
     })
+
+    local function notify(desc, time)
+        self.Library:Notify({
+            Title = "Config",
+            Description = desc,
+            Time = time or 3,
+        })
+    end
+
+    local function refreshDropdown()
+        local fresh = self:GetConfigs()
+        if configDropdown.SetValues then
+            configDropdown:SetValues(fresh)
+        elseif configDropdown.Refresh then
+            configDropdown:Refresh(fresh)
+        end
+    end
 
     box:AddButton({
         Text = "Create / Save",
         Func = function()
-            local name = nameInput:GetValue()
-            if not name or name == "" then
+            local name = nameInput and nameInput:GetValue() or ""
+            name = name:match("^%s*(.-)%s*$")
+
+            if name == "" then
                 local sel = configDropdown:GetValue()
                 if sel and sel ~= "" then
                     name = sel
                 else
-                    self.Library:Notify({ Title = "Config", Description = "Enter a name first", Time = 3 })
+                    notify("Enter a config name first")
                     return
                 end
             end
+
             local ok = self:Save(name)
             if ok then
-                configDropdown:SetValues(self:GetConfigs())
-                self.Library:Notify({ Title = "Config", Description = "Saved: " .. name, Time = 3 })
+                refreshDropdown()
+                notify("Saved: " .. name)
             else
-                self.Library:Notify({ Title = "Config", Description = "Failed to save", Time = 3 })
+                notify("Failed to save config")
             end
         end,
     })
@@ -268,14 +426,15 @@ function SaveManager:BuildConfigSection(tab)
         Func = function()
             local sel = configDropdown:GetValue()
             if not sel or sel == "" then
-                self.Library:Notify({ Title = "Config", Description = "Select a config first", Time = 3 })
+                notify("Select a config first")
                 return
             end
+
             local ok = self:Load(sel)
             if ok then
-                self.Library:Notify({ Title = "Config", Description = "Loaded: " .. sel, Time = 3 })
+                notify("Loaded: " .. sel)
             else
-                self.Library:Notify({ Title = "Config", Description = "Failed to load", Time = 3 })
+                notify("Failed to load: " .. sel)
             end
         end,
     })
@@ -285,11 +444,16 @@ function SaveManager:BuildConfigSection(tab)
         Func = function()
             local sel = configDropdown:GetValue()
             if not sel or sel == "" then
-                self.Library:Notify({ Title = "Config", Description = "Select a config first", Time = 3 })
+                notify("Select a config first")
                 return
             end
-            self:Save(sel)
-            self.Library:Notify({ Title = "Config", Description = "Overwrote: " .. sel, Time = 3 })
+
+            local ok = self:Save(sel)
+            if ok then
+                notify("Overwrote: " .. sel)
+            else
+                notify("Failed to overwrite: " .. sel)
+            end
         end,
     })
 
@@ -299,20 +463,21 @@ function SaveManager:BuildConfigSection(tab)
         Func = function()
             local sel = configDropdown:GetValue()
             if not sel or sel == "" then
-                self.Library:Notify({ Title = "Config", Description = "Select a config first", Time = 3 })
+                notify("Select a config first")
                 return
             end
+
             self:Delete(sel)
-            configDropdown:SetValues(self:GetConfigs())
-            self.Library:Notify({ Title = "Config", Description = "Deleted: " .. sel, Time = 3 })
+            refreshDropdown()
+            notify("Deleted: " .. sel)
         end,
     })
 
     box:AddButton({
         Text = "Refresh List",
         Func = function()
-            configDropdown:SetValues(self:GetConfigs())
-            self.Library:Notify({ Title = "Config", Description = "List refreshed", Time = 2 })
+            refreshDropdown()
+            notify("List refreshed", 2)
         end,
     })
 
@@ -323,11 +488,11 @@ function SaveManager:BuildConfigSection(tab)
         Func = function()
             local sel = configDropdown:GetValue()
             if not sel or sel == "" then
-                self.Library:Notify({ Title = "Config", Description = "Select a config first", Time = 3 })
+                notify("Select a config first")
                 return
             end
             self:SetAutoload(sel)
-            self.Library:Notify({ Title = "Config", Description = "Autoload set: " .. sel, Time = 3 })
+            notify("Autoload set: " .. sel)
         end,
     })
 
@@ -335,19 +500,29 @@ function SaveManager:BuildConfigSection(tab)
         Text = "Clear Autoload",
         Func = function()
             self:SetAutoload("")
-            self.Library:Notify({ Title = "Config", Description = "Autoload cleared", Time = 3 })
+            notify("Autoload cleared")
         end,
     })
 
-    local autoLbl = box:AddLabel("Autoload: " .. (self:GetAutoload() or "None"))
+    local currentAutoText = "Autoload: " .. (self:GetAutoload() or "None")
+    local autoLbl = box:AddLabel(currentAutoText)
 
     task.spawn(function()
-        while autoLbl._Label and autoLbl._Label.Parent do
+        while task.wait(1) do
+            local stillAlive = false
+            pcall(function()
+                if autoLbl and autoLbl.SetText then
+                    stillAlive = true
+                end
+            end)
+            if not stillAlive then break end
+
             local cur = self:GetAutoload() or "None"
-            if autoLbl._Label.Text ~= "Autoload: " .. cur then
-                autoLbl:SetText("Autoload: " .. cur)
+            local want = "Autoload: " .. cur
+            if currentAutoText ~= want then
+                currentAutoText = want
+                pcall(function() autoLbl:SetText(want) end)
             end
-            task.wait(1)
         end
     end)
 
